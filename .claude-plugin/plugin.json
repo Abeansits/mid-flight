@@ -1,0 +1,11 @@
+{
+  "name": "mid-flight",
+  "description": "On-demand consultation with Codex or Gemini at any point during development",
+  "version": "1.0.0",
+  "author": {
+    "name": "Abeansits"
+  },
+  "repository": "https://github.com/abeansits/mid-flight",
+  "license": "MIT",
+  "keywords": ["consultation", "codex", "gemini", "mid-flight", "skills"]
+}

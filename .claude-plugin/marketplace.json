@@ -1,0 +1,17 @@
+{
+  "name": "mid-flight",
+  "owner": {
+    "name": "Abeansits"
+  },
+  "metadata": {
+    "description": "On-demand consultation with Codex or Gemini at any point during development",
+    "version": "1.0.0"
+  },
+  "plugins": [{
+    "name": "mid-flight",
+    "source": "./",
+    "description": "Consult Codex or Gemini mid-development via /midflight. Get a second opinion when stuck, validate approaches, or sanity-check decisions without leaving your session.",
+    "category": "code-quality",
+    "tags": ["consultation", "codex", "gemini", "skills", "second-opinion"]
+  }]
+}
