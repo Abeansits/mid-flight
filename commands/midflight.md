@@ -18,10 +18,17 @@ You've been invoked to consult an external model (Codex or Gemini) for a second 
    - If `$ARGUMENTS` contains a question, use that as the core question but still provide context.
    - If `$ARGUMENTS` is empty, identify what would most benefit from a second opinion based on the conversation so far (e.g., you're stuck debugging, choosing between approaches, unsure about an architecture decision).
 
-3. **Write the query file** — Create a temp file with your context summary and question. This avoids shell escaping issues with large text.
+3. **Classify intent** — Decide whether this is a consultation or an implementation request:
+
+   - **`consult`** — Questions, tradeoff analysis, debugging help, architecture validation, "should we...", "what's the best way to...", or any request for advice/perspective. **When uncertain, default to consult.**
+   - **`implement`** — Specific file changes with clear specs: "add X to file Y", "fix Z in W", complete code blocks with file paths. Only use this when the query contains precise, actionable implementation instructions.
+
+   Set `INTENT="consult"` or `INTENT="implement"` based on the above.
+
+4. **Write the query file** — Create a temp file with your context summary and question. This avoids shell escaping issues with large text.
 
    ```
-   QUERY_FILE=$(mktemp /tmp/midflight-query-XXXXXX.md)
+   QUERY_FILE=$(mktemp "${TMPDIR:-/tmp}/midflight-query.XXXXXX")
    ```
 
    Write the file with this structure:
@@ -37,17 +44,17 @@ You've been invoked to consult an external model (Codex or Gemini) for a second 
     a decision between approaches, debugging help, architecture validation, etc.]
    ```
 
-4. **Call the query script**:
+5. **Call the query script**:
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/query.sh" "$QUERY_FILE"
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/query.sh" "$QUERY_FILE" "$INTENT"
    ```
 
    The script outputs the response to stdout. Capture it.
 
-5. **Clean up** — Remove the temp query file.
+6. **Clean up** — Remove the temp query file.
 
-6. **Present the findings** — Share the external model's response with the user. Add your own analysis:
+7. **Present the findings** — Share the external model's response with the user. Add your own analysis:
    - Where do you agree or disagree with the external model's assessment?
    - What's the recommended next step given both perspectives?
    - If the external model raised concerns you hadn't considered, acknowledge them.
