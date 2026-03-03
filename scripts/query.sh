@@ -5,7 +5,7 @@
 # optimized for mid-development consultation, and routes to the configured
 # provider (Codex or Gemini). Response goes to stdout.
 #
-# Usage: query.sh <query-file-path>
+# Usage: query.sh <query-file-path> [consult|implement]
 
 set -euo pipefail
 
@@ -21,6 +21,11 @@ if [ $# -lt 1 ] || [ -z "$1" ]; then
 fi
 
 query_file="$1"
+mode="${2:-consult}"
+case "$mode" in
+  consult|implement) ;;
+  *) log "unknown mode '$mode', defaulting to consult"; mode="consult" ;;
+esac
 
 if [ ! -f "$query_file" ]; then
   log "error: query file not found: $query_file"
@@ -62,15 +67,47 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# System prompt for mid-development consultation
+# Preflight dependency check
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT='You are a senior engineer being consulted mid-development. Another engineer (an AI assistant) is working on a task and needs your perspective.
+if ! command -v "$provider" >/dev/null 2>&1; then
+  case "$provider" in
+    codex)  install_url="https://github.com/openai/codex" ;;
+    gemini) install_url="https://github.com/google-gemini/gemini-cli" ;;
+    *)      install_url="" ;;
+  esac
+  log "error: '$provider' not found in PATH"
+  echo "Error: '$provider' CLI not found. Install it: $install_url"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# System prompt — selected by mode
+# ---------------------------------------------------------------------------
+CONSULT_PROMPT='You are a senior engineer being consulted mid-development. Another engineer (an AI assistant) is working on a task and needs your perspective.
 
 Be direct and concise:
 - If you see a clear issue, say so immediately
 - If the approach looks sound, confirm briefly and suggest next steps
 - If there are multiple valid paths, lay out the tradeoffs in bullets
-- Don'"'"'t rehash what they already know — add new signal only'
+- Don'"'"'t rehash what they already know — add new signal only
+- Do NOT modify any files. Provide advice only.'
+
+IMPLEMENT_PROMPT='You are an implementation engineer. Another engineer (an AI assistant) has specified exact changes that need to be made.
+
+Your job:
+- Read the existing files referenced in the task
+- Apply the described edits precisely
+- Run any verification commands specified (typecheck, lint, tests)
+- Report what you changed and the verification results
+- If something is ambiguous, make the conservative choice and note it'
+
+if [ "$mode" = "implement" ]; then
+  SYSTEM_PROMPT="$IMPLEMENT_PROMPT"
+else
+  SYSTEM_PROMPT="$CONSULT_PROMPT"
+fi
+
+log "mode=$mode"
 
 # ---------------------------------------------------------------------------
 # Provider functions
@@ -116,8 +153,9 @@ ${query_content}"
 # ---------------------------------------------------------------------------
 log "sending query to $provider (${#query_content} chars)..."
 
-response_file=$(mktemp /tmp/midflight-response-XXXXXX.txt)
+response_file=$(mktemp "${TMPDIR:-/tmp}/midflight-response.XXXXXX")
 trap 'rm -f "$response_file"' EXIT
+start_time=$SECONDS
 
 case "$provider" in
   codex)
@@ -149,5 +187,6 @@ if [ -z "$response" ]; then
   exit 1
 fi
 
-log "response received (${#response} chars)"
+duration=$(( SECONDS - start_time ))
+log "response received (${#response} chars) in ${duration}s"
 echo "$response"

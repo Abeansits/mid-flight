@@ -25,6 +25,15 @@ No transcript parsing, no hooks — Claude already has full context, so it write
 | **Purpose** | Catch plan issues before approval | Get unstuck, validate approaches, second opinions |
 | **Mechanism** | Hook + deny/retry pattern | Skill (slash command) + query script |
 
+## Consult vs Implement
+
+MidFlight automatically infers whether you need advice or implementation:
+
+- **Consult** (default) — "Should we use X or Y?", debugging help, architecture validation. The external model provides advice without modifying files.
+- **Implement** — Precise, spec-driven changes: "Add method X to file Y with these exact signatures." The external model reads files, makes edits, and runs verification.
+
+You don't need to specify which mode — Claude classifies intent from the query. When uncertain, it defaults to consult (safe by default).
+
 ## Requirements
 
 - [Claude Code](https://claude.ai/code) CLI
@@ -91,9 +100,18 @@ claude plugin marketplace remove mid-flight
 
 Restart Claude Code after uninstalling.
 
+## Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `'codex' CLI not found` | Codex CLI not installed or not in PATH | Install from [github.com/openai/codex](https://github.com/openai/codex) |
+| `'gemini' CLI not found` | Gemini CLI not installed or not in PATH | Install from [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
+| `Codex query failed` | Auth issue or network error | Run `codex --version` to verify install, check API key |
+| `Empty response` | Provider returned nothing | Try again or switch providers in config |
+
 ## Debugging
 
-Run Claude Code with `claude --debug` to see query execution logs. All logs are prefixed with `[mid-flight]` on stderr.
+Run Claude Code with `claude --debug` to see query execution logs. All logs are prefixed with `[mid-flight]` on stderr and include mode, provider, query size, response size, and duration.
 
 <details>
 <summary><strong>Technical details</strong></summary>
