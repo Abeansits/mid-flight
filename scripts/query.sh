@@ -51,14 +51,14 @@ codex_reasoning_effort="high"
 gemini_model="gemini-2.5-pro"
 
 if [ -f "$config_file" ]; then
-  val=$(grep '^provider=' "$config_file" | cut -d= -f2- | tr -d '[:space:]')
+  val=$(grep '^provider=' "$config_file" | cut -d= -f2- | tr -d '[:space:]' || true)
   [ -n "$val" ] && provider="$val"
 
-  val=$(grep '^codex_model=' "$config_file" | cut -d= -f2- | tr -d '[:space:]')
+  val=$(grep '^codex_model=' "$config_file" | cut -d= -f2- | tr -d '[:space:]' || true)
   [ -n "$val" ] && codex_model="$val"
-  val=$(grep '^codex_reasoning_effort=' "$config_file" | cut -d= -f2- | tr -d '[:space:]')
+  val=$(grep '^codex_reasoning_effort=' "$config_file" | cut -d= -f2- | tr -d '[:space:]' || true)
   [ -n "$val" ] && codex_reasoning_effort="$val"
-  val=$(grep '^gemini_model=' "$config_file" | cut -d= -f2- | tr -d '[:space:]')
+  val=$(grep '^gemini_model=' "$config_file" | cut -d= -f2- | tr -d '[:space:]' || true)
   [ -n "$val" ] && gemini_model="$val"
 
   log "config loaded: provider=$provider"
