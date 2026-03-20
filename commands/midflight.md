@@ -52,9 +52,7 @@ You've been invoked to consult an external model (Codex or Gemini) for a second 
 
    The script outputs the response to stdout. Capture it.
 
-6. **Clean up** — Remove the temp query file.
-
-7. **Present the findings** — Share the external model's response with the user. Add your own analysis:
+6. **Present the findings** — Share the external model's response with the user. Add your own analysis:
    - Where do you agree or disagree with the external model's assessment?
    - What's the recommended next step given both perspectives?
    - If the external model raised concerns you hadn't considered, acknowledge them.
