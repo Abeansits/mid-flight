@@ -1,8 +1,8 @@
 # mid-flight
 
-#### On-demand consultation with Codex or Gemini at any point during development. Get a second opinion when you're stuck, validate an approach before committing to it, or sanity-check an architecture decision — without leaving your Claude Code session.
+#### On-demand consultation with Codex or Gemini at any point during development. Get a second opinion when you're stuck, validate an approach before committing to it, analyze video content, or sanity-check an architecture decision — without leaving your Claude Code session.
 
-A [Claude Code](https://claude.ai/code) plugin that provides ad-hoc consultations with the [Codex](https://github.com/openai/codex) or [Gemini](https://github.com/google-gemini/gemini-cli) CLI.
+A [Claude Code](https://claude.ai/code) plugin that provides ad-hoc consultations with the [Codex](https://github.com/openai/codex) or [Gemini](https://github.com/google-gemini/gemini-cli) CLI. Supports text-based consultation, implementation delegation, and **video analysis** via Gemini's multimodal capabilities.
 
 Companion to [pre-flight](https://github.com/abeansits/pre-flight), which reviews plans automatically. MidFlight is for everything that happens *after* planning.
 
@@ -25,12 +25,13 @@ No transcript parsing, no hooks — Claude already has full context, so it write
 | **Purpose** | Catch plan issues before approval | Get unstuck, validate approaches, second opinions |
 | **Mechanism** | Hook + deny/retry pattern | Skill (slash command) + query script |
 
-## Consult vs Implement
+## Modes
 
-MidFlight automatically infers whether you need advice or implementation:
+MidFlight automatically infers the right mode from your query:
 
 - **Consult** (default) — "Should we use X or Y?", debugging help, architecture validation. The external model provides advice without modifying files.
 - **Implement** — Precise, spec-driven changes: "Add method X to file Y with these exact signatures." The external model reads files, makes edits, and runs verification.
+- **Video** — Analyze video files or URLs using Gemini's multimodal capabilities. Produces structured scene breakdowns, ad quality reviews, and content verification. Auto-switches to Gemini regardless of your configured provider.
 
 You don't need to specify which mode — Claude classifies intent from the query. When uncertain, it defaults to consult (safe by default).
 
@@ -80,6 +81,15 @@ Separate config from pre-flight so you can use different models/settings for ad-
 # No question — Claude identifies what needs a second opinion
 /midflight
 
+# Analyze a local video file
+/midflight --video ./ad-v3.mp4
+
+# Analyze a YouTube video
+/midflight --video https://youtube.com/watch?v=abc123
+
+# Video with a specific question
+/midflight --video ./ad-v3.mp4 Does this match the storyboard we discussed?
+
 # Claude can also self-invoke when it recognizes it's stuck
 # (after 3+ failed attempts, unfamiliar technology, etc.)
 ```
@@ -108,6 +118,8 @@ Restart Claude Code after uninstalling.
 | `'gemini' CLI not found` | Gemini CLI not installed or not in PATH | Install from [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
 | `Codex query failed` | Auth issue or network error | Run `codex --version` to verify install, check API key |
 | `Empty response` | Provider returned nothing | Try again or switch providers in config |
+| `Video file exceeds 20MB limit` | Gemini CLI inline file limit | Compress or trim the video before analysis |
+| `Could not determine file size` | `stat` failed on the video file | Check file permissions and path |
 
 ## Debugging
 
@@ -135,6 +147,10 @@ MidFlight is a skill-based plugin (slash command), not a hook-based plugin like 
 ### Provider abstraction
 
 Same pattern as pre-flight: separate functions (`query_codex`, `query_gemini`) behind a config-driven router. Adding a new provider requires only a new function and case branch.
+
+### Video analysis
+
+Video mode accepts local files or URLs. Local files are copied to a temp staging directory and passed to Gemini CLI using the `@path` inline syntax. URLs are passed directly in the prompt — Gemini handles fetching natively. Local files are sandboxed: the staging dir is the only path exposed via `--include-directories`, so the parent directory is never accessible to Gemini. The staging dir is cleaned up on exit. Gemini CLI enforces a 20MB limit on inline files; the script validates this upfront.
 
 ### Self-invocation
 
