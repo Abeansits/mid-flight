@@ -6,6 +6,7 @@
 # provider (Codex or Gemini). Response goes to stdout.
 #
 # Usage: query.sh <query-file-path> [consult|implement]
+#        query.sh <video-file-or-url> video [prompt]
 
 set -euo pipefail
 
@@ -23,22 +24,77 @@ fi
 query_file="$1"
 mode="${2:-consult}"
 case "$mode" in
-  consult|implement) ;;
+  consult|implement|video) ;;
   *) log "unknown mode '$mode', defaulting to consult"; mode="consult" ;;
 esac
 
-if [ ! -f "$query_file" ]; then
-  log "error: query file not found: $query_file"
-  echo "Error: Query file not found: $query_file"
-  exit 1
-fi
+DEFAULT_VIDEO_PROMPT='Provide a comprehensive scene-by-scene breakdown of this video. Organize the analysis into a Markdown table with the following columns:
 
-query_content=$(cat "$query_file")
+1. Timestamp: Approximate start and end time of the scene or cut.
+2. Visual Narrative: Action, characters, setting, lighting, and color palette.
+3. Text & Graphics: Any on-screen text, logos, CTAs, lower thirds, or supers.
+4. Cinematography & Editing: Shot types (CU, Wide, POV), camera movement, and transitions.
+5. Audio & Soundscape: Music, SFX, ambient sound, dialogue, or voiceover.
+6. Emotional Beat: The intended mood or emotional shift in this segment.
 
-if [ -z "$query_content" ]; then
-  log "error: query file is empty: $query_file"
-  echo "Error: Query file is empty."
-  exit 1
+After the table, provide:
+- A brief summary of the visual symbolism and how color grading supports the storytelling.
+- If this is an advertisement: evaluate messaging clarity, call-to-action effectiveness, and brand consistency.'
+
+if [ "$mode" = "video" ]; then
+  # --- Video mode: arg1 is a video file or URL, arg3 is optional prompt ---
+  video_source="$query_file"
+  video_prompt="${3:-$DEFAULT_VIDEO_PROMPT}"
+
+  # Detect URL vs local file
+  if [[ "$video_source" =~ ^https?:// ]]; then
+    video_is_url=true
+    log "video source: URL"
+  else
+    video_is_url=false
+
+    if [ ! -f "$video_source" ]; then
+      log "error: video file not found: $video_source"
+      echo "Error: Video file not found: $video_source"
+      exit 1
+    fi
+
+    # Gemini CLI has a 20MB inline file size limit for local files
+    file_size=$(stat -f%z "$video_source" 2>/dev/null || stat -c%s "$video_source" 2>/dev/null || echo "")
+    if [ -z "$file_size" ] || [ "$file_size" -eq 0 ]; then
+      log "error: could not determine file size: $video_source"
+      echo "Error: Could not determine file size for: $video_source"
+      exit 1
+    fi
+    max_size=$((20 * 1024 * 1024))
+    if [ "$file_size" -gt "$max_size" ]; then
+      size_mb=$(( file_size / 1024 / 1024 ))
+      log "error: video file exceeds 20MB limit (${size_mb}MB): $video_source"
+      echo "Error: Video file exceeds Gemini CLI's 20MB limit (${size_mb}MB). Compress or trim the video first."
+      exit 1
+    fi
+
+    # Copy video to a temp staging dir so --include-directories doesn't expose the parent.
+    # Max 20MB (enforced above), cleaned up on exit.
+    video_stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/midflight-video.XXXXXX")
+    cp "$video_source" "$video_stage_dir/video_input.mp4"
+    video_source="$video_stage_dir/video_input.mp4"
+  fi
+else
+  # --- Text modes: arg1 is a query file ---
+  if [ ! -f "$query_file" ]; then
+    log "error: query file not found: $query_file"
+    echo "Error: Query file not found: $query_file"
+    exit 1
+  fi
+
+  query_content=$(cat "$query_file")
+
+  if [ -z "$query_content" ]; then
+    log "error: query file is empty: $query_file"
+    echo "Error: Query file is empty."
+    exit 1
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -64,6 +120,14 @@ if [ -f "$config_file" ]; then
   log "config loaded: provider=$provider"
 else
   log "no config file found at $config_file, using defaults"
+fi
+
+# Video mode requires Gemini (multimodal)
+if [ "$mode" = "video" ]; then
+  if [ "$provider" != "gemini" ]; then
+    log "video mode: overriding provider=$provider → gemini (video requires multimodal)"
+  fi
+  provider="gemini"
 fi
 
 # ---------------------------------------------------------------------------
@@ -101,11 +165,21 @@ Your job:
 - Report what you changed and the verification results
 - If something is ambiguous, make the conservative choice and note it'
 
-if [ "$mode" = "implement" ]; then
-  SYSTEM_PROMPT="$IMPLEMENT_PROMPT"
-else
-  SYSTEM_PROMPT="$CONSULT_PROMPT"
-fi
+VIDEO_PROMPT='You are a video analyst reviewing footage for a creative team. You have deep expertise in video production, advertising, and visual storytelling.
+
+Your job:
+- Analyze the video thoroughly and respond to the prompt
+- For scene breakdowns: describe visuals, text overlays, transitions, mood, pacing, and estimated duration per scene
+- Note any quality issues: audio sync, resolution, jarring cuts, placeholder content
+- If the video is an ad: evaluate messaging clarity, call-to-action effectiveness, brand consistency
+- Be specific and actionable — the team will use your analysis to iterate
+- Do NOT modify any files. Provide analysis only.'
+
+case "$mode" in
+  implement) SYSTEM_PROMPT="$IMPLEMENT_PROMPT" ;;
+  video)     SYSTEM_PROMPT="$VIDEO_PROMPT" ;;
+  *)         SYSTEM_PROMPT="$CONSULT_PROMPT" ;;
+esac
 
 log "mode=$mode"
 
@@ -129,32 +203,53 @@ query_codex() {
 query_gemini() {
   local full_prompt="$1"
   local output_file="$2"
+  local include_dir="${3:-}"
+
+  # Always sandbox; add --include-directories when accessing files outside cwd
+  local sandbox_args=(--sandbox)
+  if [ -n "$include_dir" ]; then
+    sandbox_args+=(--include-directories "$include_dir")
+  fi
 
   gemini \
     -p "$full_prompt" \
     -m "$gemini_model" \
-    --sandbox \
+    "${sandbox_args[@]}" \
     --output-format text \
     > "$output_file" \
     2> >(while IFS= read -r line; do log "gemini: $line"; done)
 }
 
 # ---------------------------------------------------------------------------
-# Build the full prompt (system prompt + query content)
+# Build the full prompt (system prompt + query/video content)
 # ---------------------------------------------------------------------------
-full_prompt="${SYSTEM_PROMPT}
+if [ "$mode" = "video" ]; then
+  # URLs go directly in the prompt; local files use @path for Gemini CLI
+  if [ "$video_is_url" = true ]; then
+    video_ref="$video_source"
+  else
+    video_ref="@${video_source}"
+  fi
+
+  full_prompt="${SYSTEM_PROMPT}
+
+---
+
+${video_prompt}
+
+${video_ref}"
+  log "sending video query to gemini (source: ${video_source##*/}, prompt: ${#video_prompt} chars)..."
+else
+  full_prompt="${SYSTEM_PROMPT}
 
 ---
 
 ${query_content}"
-
-# ---------------------------------------------------------------------------
-# Provider routing
-# ---------------------------------------------------------------------------
-log "sending query to $provider (${#query_content} chars)..."
+  log "sending query to $provider (${#query_content} chars)..."
+fi
 
 response_file=$(mktemp "${TMPDIR:-/tmp}/midflight-response.XXXXXX")
-trap 'rm -f "$response_file"' EXIT
+trap 'rm -f "$response_file"; [ -n "${video_stage_dir:-}" ] && rm -rf "$video_stage_dir"' EXIT
 start_time=$SECONDS
 
 case "$provider" in
@@ -166,7 +261,11 @@ case "$provider" in
     fi
     ;;
   gemini)
-    if ! query_gemini "$full_prompt" "$response_file"; then
+    gemini_include_dir=""
+    if [ "$mode" = "video" ] && [ "$video_is_url" = false ]; then
+      gemini_include_dir="$(dirname "$video_source")"
+    fi
+    if ! query_gemini "$full_prompt" "$response_file" "$gemini_include_dir"; then
       log "gemini exec failed"
       echo "Error: Gemini query failed. Make sure the Gemini CLI is installed and authenticated."
       exit 1
