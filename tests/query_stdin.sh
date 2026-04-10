@@ -2,17 +2,12 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-test.XXXXXX")"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
-cleanup() {
-  rm -rf "$TEST_DIR"
-}
-trap cleanup EXIT
+setup_test_env
+trap cleanup_test_env EXIT
 
-mkdir -p "$TEST_DIR/bin" "$TEST_DIR/home/.config/mid-flight"
-
-cat > "$TEST_DIR/home/.config/mid-flight/config" <<'EOF'
+write_config <<'EOF'
 provider=codex
 codex_model=test-model
 codex_reasoning_effort=high
@@ -55,14 +50,15 @@ EOF
 
 chmod +x "$TEST_DIR/bin/codex"
 
-QUERY_FILE="$TEST_DIR/query.md"
-cat > "$QUERY_FILE" <<'EOF'
+QUERY_FILE="$(
+  write_query_file <<'EOF'
 ## Context
 Testing stdin detachment.
 
 ## Question
 Does the wrapper return promptly?
 EOF
+)"
 
 STDIN_PIPE="$TEST_DIR/stdin.pipe"
 mkfifo "$STDIN_PIPE"
@@ -71,11 +67,7 @@ mkfifo "$STDIN_PIPE"
 writer_pid=$!
 
 SECONDS=0
-output="$(
-  HOME="$TEST_DIR/home" \
-  PATH="$TEST_DIR/bin:$PATH" \
-  bash "$ROOT_DIR/scripts/query.sh" "$QUERY_FILE" consult < "$STDIN_PIPE"
-)"
+output="$(run_query "$QUERY_FILE" consult < "$STDIN_PIPE")"
 duration=$SECONDS
 
 wait "$writer_pid" || true
@@ -85,9 +77,6 @@ if [ "$duration" -ge 2 ]; then
   exit 1
 fi
 
-if [ "$output" != "stdin-detached" ]; then
-  echo "FAIL: unexpected output: $output" >&2
-  exit 1
-fi
+assert_eq "stdin-detached" "$output" "stdin detachment test should return the stubbed output"
 
 echo "PASS: provider stdin detached in ${duration}s"

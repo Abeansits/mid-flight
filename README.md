@@ -126,6 +126,14 @@ Restart Claude Code after uninstalling.
 
 Run Claude Code with `claude --debug` to see query execution logs. All logs are prefixed with `[mid-flight]` on stderr and include mode, provider, query size, response size, and duration.
 
+## Development
+
+Run the shell regression suite with:
+
+```bash
+bash tests/run_all.sh
+```
+
 <details>
 <summary><strong>Technical details</strong></summary>
 
@@ -148,6 +156,8 @@ MidFlight is a skill-based plugin (slash command), not a hook-based plugin like 
 ### Provider abstraction
 
 Same pattern as pre-flight: separate functions (`query_codex`, `query_gemini`) behind a config-driven router. Adding a new provider requires only a new function and case branch.
+
+The `scripts/query.sh` entrypoint now delegates to helper modules under `scripts/lib/`, with prompts stored in `prompts/`. Each invocation gets its own temporary run workspace for staged inputs, prompt assembly, provider logs, and response capture.
 
 MidFlight explicitly detaches stdin before launching provider CLIs. This avoids deadlocks when a caller leaves stdin connected to an open pipe; Codex will otherwise read piped stdin even when the main prompt is already supplied as an argument.
 
