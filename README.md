@@ -1,10 +1,41 @@
 # mid-flight
 
-#### On-demand consultation with Codex or Gemini at any point during development. Get a second opinion when you're stuck, validate an approach before committing to it, analyze video content, or sanity-check an architecture decision — without leaving your Claude Code session.
+```text
+ __  __ ___ ____        _____ _     ___ ____ _   _ _____
+|  \/  |_ _|  _ \ _____|  ___| |   |_ _/ ___| | | |_   _|
+| |\/| || || | | |_____| |_  | |    | | |  _| |_| | | |
+| |  | || || |_| |     |  _| | |___ | | |_| |  _  | | |
+|_|  |_|___|____/      |_|   |_____|___\____|_| |_| |_|
+```
 
-A [Claude Code](https://claude.ai/code) plugin that provides ad-hoc consultations with the [Codex](https://github.com/openai/codex) or [Gemini](https://github.com/google-gemini/gemini-cli) CLI. Supports text-based consultation, implementation delegation, and **video analysis** via Gemini's multimodal capabilities.
+**Get a second opinion from Codex or Gemini without leaving your Claude Code session.**
 
-Companion to [pre-flight](https://github.com/abeansits/pre-flight), which reviews plans automatically. MidFlight is for everything that happens *after* planning.
+MidFlight is a [Claude Code](https://claude.ai/code) plugin for moments when you're already in the middle of a task and want outside signal before you continue.
+
+Instead of copying context into another tool by hand, you run `/midflight`, Claude summarizes the relevant state, and the external model responds with focused advice, precise implementation help, or video analysis.
+
+At a glance:
+
+- Ask architecture, debugging, and tradeoff questions without leaving Claude Code
+- Hand off tightly scoped implementation work to an external model
+- Analyze local or remote videos with Gemini's multimodal support
+- Let Claude self-invoke when it recognizes it would benefit from another perspective
+
+## What it's for
+
+- Sanity-checking an approach when you're unsure between a few valid options
+- Getting unstuck on debugging, architecture, or API integration work
+- Delegating a precise, well-scoped implementation task
+- Reviewing creative assets or ads through structured video analysis
+- Adding outside signal without rebuilding all of the context manually
+
+## What it's not for
+
+- Replacing Claude Code as your main development loop
+- Handing off an entire project with no clear scope or constraints
+- Automatic background review or hook-based workflow enforcement
+- Vague "go build this whole thing" requests with no concrete target
+- General-purpose browsing or research unrelated to the task already in progress
 
 ## How it works
 
@@ -15,15 +46,6 @@ Companion to [pre-flight](https://github.com/abeansits/pre-flight), which review
 5. Claude presents the external model's perspective alongside its own analysis
 
 No transcript parsing, no hooks — Claude already has full context, so it writes a concise summary and question directly.
-
-## How it's different from pre-flight
-
-| | pre-flight | mid-flight |
-|---|---|---|
-| **Trigger** | Automatic (ExitPlanMode hook) | Manual (`/midflight`) or Claude-initiated |
-| **Context** | Plan file (extracted from transcript) | Claude's own summary (already has full context) |
-| **Purpose** | Catch plan issues before approval | Get unstuck, validate approaches, second opinions |
-| **Mechanism** | Hook + deny/retry pattern | Skill (slash command) + query script |
 
 ## Modes
 
@@ -70,7 +92,7 @@ gemini_model=gemini-2.5-pro
 | `codex_reasoning_effort` | `high`           | Reasoning effort (low/medium/high)  |
 | `gemini_model`           | `gemini-2.5-pro` | Gemini model to use                 |
 
-Separate config from pre-flight so you can use different models/settings for ad-hoc queries vs plan reviews.
+Keeping MidFlight's config separate makes it easy to tune these settings without affecting other Claude Code helpers.
 
 ## Usage
 
@@ -139,7 +161,7 @@ bash tests/run_all.sh
 
 ### Architecture
 
-MidFlight is a skill-based plugin (slash command), not a hook-based plugin like pre-flight. This is a deliberate design choice:
+MidFlight is a skill-based plugin (slash command). This is a deliberate design choice:
 
 - **Skills run inside Claude's context** — Claude already knows everything about the current task, so there's no need for transcript parsing
 - **Claude summarizes, not transcript extraction** — produces better, more focused context than any parsing could
@@ -155,7 +177,7 @@ MidFlight is a skill-based plugin (slash command), not a hook-based plugin like 
 
 ### Provider abstraction
 
-Same pattern as pre-flight: separate functions (`query_codex`, `query_gemini`) behind a config-driven router. Adding a new provider requires only a new function and case branch.
+Providers are isolated behind separate functions (`query_codex`, `query_gemini`) and a small config-driven router. Adding a new provider requires only a new function and a new case branch.
 
 The `scripts/query.sh` entrypoint now delegates to helper modules under `scripts/lib/`, with prompts stored in `prompts/`. Each invocation gets its own temporary run workspace for staged inputs, prompt assembly, provider logs, and response capture.
 
