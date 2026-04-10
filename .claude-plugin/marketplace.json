@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "On-demand consultation with Codex or Gemini at any point during development",
-    "version": "1.0.1"
+    "version": "1.3.0"
   },
   "plugins": [{
     "name": "mid-flight",

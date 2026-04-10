@@ -1,0 +1,28 @@
+name: Shell Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  shell-tests:
+    name: Shell Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Syntax check shell scripts
+        run: find scripts tests -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
+      - name: Run MidFlight shell test suite
+        run: bash tests/run_all.sh
