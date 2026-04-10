@@ -183,6 +183,12 @@ esac
 
 log "mode=$mode"
 
+# Claude plugin invocations can leave stdin connected to an open pipe.
+# Codex treats piped stdin as extra prompt content even when a prompt argument
+# is provided, which can block until the parent closes stdin. This script never
+# reads from stdin, so detach here before invoking any provider CLI.
+exec </dev/null
+
 # ---------------------------------------------------------------------------
 # Provider functions
 # ---------------------------------------------------------------------------

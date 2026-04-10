@@ -118,6 +118,7 @@ Restart Claude Code after uninstalling.
 | `'gemini' CLI not found` | Gemini CLI not installed or not in PATH | Install from [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
 | `Codex query failed` | Auth issue or network error | Run `codex --version` to verify install, check API key |
 | `Empty response` | Provider returned nothing | Try again or switch providers in config |
+| `MidFlight hangs before Codex responds` | Codex inherited an open stdin stream from the caller and is waiting for EOF | Upgrade MidFlight; the wrapper now detaches stdin before invoking provider CLIs |
 | `Video file exceeds 20MB limit` | Gemini CLI inline file limit | Compress or trim the video before analysis |
 | `Could not determine file size` | `stat` failed on the video file | Check file permissions and path |
 
@@ -147,6 +148,8 @@ MidFlight is a skill-based plugin (slash command), not a hook-based plugin like 
 ### Provider abstraction
 
 Same pattern as pre-flight: separate functions (`query_codex`, `query_gemini`) behind a config-driven router. Adding a new provider requires only a new function and case branch.
+
+MidFlight explicitly detaches stdin before launching provider CLIs. This avoids deadlocks when a caller leaves stdin connected to an open pipe; Codex will otherwise read piped stdin even when the main prompt is already supplied as an argument.
 
 ### Video analysis
 
