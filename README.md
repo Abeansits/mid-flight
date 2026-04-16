@@ -8,7 +8,7 @@
 |_|  |_|___|____/      |_|   |_____|___\____|_| |_| |_|
 ```
 
-**Get a second opinion from Codex or Gemini without leaving your Claude Code session.**
+**Get a second opinion through Codex, Gemini, OpenCode, or Oz without leaving your Claude Code session.**
 
 MidFlight is a [Claude Code](https://claude.ai/code) plugin for moments when you're already in the middle of a task and want outside signal before you continue.
 
@@ -42,10 +42,32 @@ At a glance:
 1. You're mid-development and want a second opinion
 2. Run `/midflight should we use WebSockets or SSE here?` (or just `/midflight` and Claude figures out what to ask)
 3. Claude summarizes the current context and question
-4. The query is sent to your configured provider (Codex or Gemini)
+4. The query is sent to your configured provider (Codex, Gemini, OpenCode, or Oz)
 5. Claude presents the external model's perspective alongside its own analysis
 
 No transcript parsing, no hooks — Claude already has full context, so it writes a concise summary and question directly.
+
+## Example output
+
+Here's the kind of consult response MidFlight is meant to surface:
+
+```text
+Recommendation: Start with SSE.
+
+Why:
+- Your updates are one-way from server to client, so WebSockets adds connection and state complexity you do not need yet.
+- SSE fits cleanly with your existing HTTP auth and proxy setup.
+- It will be easier to debug, monitor, and roll back if needed.
+
+Watchouts:
+- If you later need client-to-server realtime events, revisit WebSockets.
+- Confirm your load balancer and hosting platform handle long-lived HTTP responses well.
+
+Suggested next step:
+Implement SSE for notifications now, and keep the event payload contract transport-agnostic so a WebSocket move stays cheap later.
+```
+
+Claude will usually present that outside perspective alongside its own recommendation, so you get a second opinion without losing the flow of the session.
 
 ## Modes
 
@@ -63,7 +85,22 @@ You don't need to specify which mode — Claude classifies intent from the query
 - One of the following providers:
   - [Codex CLI](https://github.com/openai/codex) installed and authenticated (default)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed and authenticated
+  - [OpenCode CLI](https://opencode.ai/docs/cli/) installed and authenticated
+  - [Oz CLI](https://docs.warp.dev/reference/cli/cli) installed and authenticated
 - `bash` in your PATH
+
+## Provider capability map
+
+This is the current provider matrix for MidFlight.
+
+| Provider | Status | Consult | Implement | Video | Model selection | Extra tuning |
+|----------|--------|---------|-----------|-------|-----------------|--------------|
+| `codex` | Shipped | Yes | Yes | No | `codex_model` | `codex_reasoning_effort` |
+| `gemini` | Shipped | Yes | Yes | Yes | `gemini_model` | None today |
+| `opencode` | Shipped | Yes | Yes | No | `opencode_model` | `opencode_variant`, `opencode_format` |
+| `oz` | Shipped | Yes | Yes | No | `oz_model` | `oz_output_format`, `oz_profile` |
+
+Video mode remains Gemini-only today because MidFlight relies on Gemini's current multimodal path for local files and URLs.
 
 ## Install
 
@@ -83,16 +120,30 @@ provider=codex
 codex_model=gpt-5.3-codex
 codex_reasoning_effort=high
 gemini_model=gemini-2.5-pro
+opencode_model=
+opencode_variant=high
+opencode_format=default
+oz_model=auto
+oz_output_format=text
+oz_profile=
 ```
 
-| Setting                  | Default          | Description                         |
-|--------------------------|------------------|-------------------------------------|
-| `provider`               | `codex`          | Query provider (`codex` or `gemini`) |
-| `codex_model`            | `gpt-5.3-codex`  | Codex model to use                  |
-| `codex_reasoning_effort` | `high`           | Reasoning effort (low/medium/high)  |
-| `gemini_model`           | `gemini-2.5-pro` | Gemini model to use                 |
+| Setting                  | Default          | Description |
+|--------------------------|------------------|-------------|
+| `provider`               | `codex`          | Query provider (`codex`, `gemini`, `opencode`, or `oz`) |
+| `codex_model`            | `gpt-5.3-codex`  | Codex model to use |
+| `codex_reasoning_effort` | `high`           | Codex reasoning effort (`low`, `medium`, `high`) |
+| `gemini_model`           | `gemini-2.5-pro` | Gemini model to use |
+| `opencode_model`         | unset            | OpenCode model to use; leave blank to use the CLI default |
+| `opencode_variant`       | `high`           | OpenCode reasoning variant such as `minimal`, `high`, or `max` |
+| `opencode_format`        | `default`        | OpenCode output format (`default` or `json`) |
+| `oz_model`               | `auto`           | Oz model or preset to use; `auto` is the recommended general-purpose default |
+| `oz_output_format`       | `text`           | Oz output format used for capture |
+| `oz_profile`             | unset            | Optional Oz agent profile |
 
 Keeping MidFlight's config separate makes it easy to tune these settings without affecting other Claude Code helpers.
+
+For Oz specifically, `auto` is a good default for general MidFlight use. If you mainly use MidFlight for deep debugging, architecture tradeoffs, or other reasoning-heavy consults, try `auto-genius`.
 
 ## Usage
 
@@ -114,6 +165,9 @@ Keeping MidFlight's config separate makes it easy to tune these settings without
 
 # Claude can also self-invoke when it recognizes it's stuck
 # (after 3+ failed attempts, unfamiliar technology, etc.)
+
+# Validate your MidFlight config and provider setup
+/midflight-check-config
 ```
 
 ## Updating
@@ -134,11 +188,17 @@ Restart Claude Code after uninstalling.
 
 ## Troubleshooting
 
+If you want to validate your setup before running a real consult, use `/midflight-check-config`.
+
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `'codex' CLI not found` | Codex CLI not installed or not in PATH | Install from [github.com/openai/codex](https://github.com/openai/codex) |
 | `'gemini' CLI not found` | Gemini CLI not installed or not in PATH | Install from [github.com/google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) |
+| `'opencode' CLI not found` | OpenCode CLI not installed or not in PATH | Install from [opencode.ai/docs/cli](https://opencode.ai/docs/cli/) |
+| `'oz' CLI not found` | Oz CLI not installed or not in PATH | Install from [docs.warp.dev/reference/cli/cli](https://docs.warp.dev/reference/cli/cli) |
 | `Codex query failed` | Auth issue or network error | Run `codex --version` to verify install, check API key |
+| `OpenCode query failed` | Auth issue or provider error | Run `opencode --help` to verify install and confirm your provider credentials inside OpenCode |
+| `Oz query failed` | Auth issue or provider error | Run `oz --help` or `oz whoami` to verify install and authentication |
 | `Empty response` | Provider returned nothing | Try again or switch providers in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin stream from the caller and is waiting for EOF | Upgrade MidFlight; the wrapper now detaches stdin before invoking provider CLIs |
 | `Video file exceeds 20MB limit` | Gemini CLI inline file limit | Compress or trim the video before analysis |
@@ -177,7 +237,7 @@ MidFlight is a skill-based plugin (slash command). This is a deliberate design c
 
 ### Provider abstraction
 
-Providers are isolated behind separate functions (`query_codex`, `query_gemini`) and a small config-driven router. Adding a new provider requires only a new function and a new case branch.
+Providers are isolated behind separate functions (`query_codex`, `query_gemini`, `query_opencode`, `query_oz`) and a small config-driven router. Each provider handles its own CLI invocation details, while the shared runner handles log emission and user-facing failures consistently. Adding a new provider requires only a new function and a new case branch.
 
 The `scripts/query.sh` entrypoint now delegates to helper modules under `scripts/lib/`, with prompts stored in `prompts/`. Each invocation gets its own temporary run workspace for staged inputs, prompt assembly, provider logs, and response capture.
 

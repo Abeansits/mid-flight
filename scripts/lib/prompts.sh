@@ -1,3 +1,5 @@
+# shellcheck shell=bash disable=SC2034
+
 PROMPT_CONTENT=""
 
 read_prompt_file() {

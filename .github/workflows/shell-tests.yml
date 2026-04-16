@@ -21,6 +21,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Install ShellCheck (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Install ShellCheck (macOS)
+        if: runner.os == 'macOS'
+        run: brew install shellcheck
+
       - name: Syntax check shell scripts
         run: find scripts tests -name '*.sh' -print0 | xargs -0 -n1 bash -n
 

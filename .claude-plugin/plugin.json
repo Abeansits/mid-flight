@@ -1,11 +1,11 @@
 {
   "name": "mid-flight",
-  "description": "On-demand consultation with Codex or Gemini at any point during development, including video analysis",
-  "version": "1.3.0",
+  "description": "On-demand consultation with Codex, Gemini, OpenCode, or Oz at any point during development, including video analysis",
+  "version": "1.5.0",
   "author": {
     "name": "Abeansits"
   },
   "repository": "https://github.com/abeansits/mid-flight",
   "license": "MIT",
-  "keywords": ["consultation", "codex", "gemini", "mid-flight", "skills"]
+  "keywords": ["consultation", "codex", "gemini", "opencode", "oz", "mid-flight", "skills"]
 }

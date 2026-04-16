@@ -36,6 +36,10 @@ run_query() {
   bash "$ROOT_DIR/scripts/query.sh" "$@"
 }
 
+run_check_config() {
+  bash "$ROOT_DIR/scripts/check-config.sh" "$@"
+}
+
 assert_eq() {
   local expected="$1"
   local actual="$2"

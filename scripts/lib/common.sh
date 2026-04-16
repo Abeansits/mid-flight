@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 log() {
   echo "[mid-flight] $*" >&2
 }

@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: Consult Codex or Gemini for a second opinion mid-development, or analyze video with Gemini
+description: Consult Codex, Gemini, OpenCode, or Oz for a second opinion mid-development, or analyze video with Gemini
 model: opus
 allowed-tools: Bash, Read, Glob, Grep, Write
 user-invocable: true
@@ -8,7 +8,7 @@ user-invocable: true
 
 # MidFlight — Mid-Development Consultation
 
-You've been invoked to consult an external model (Codex or Gemini) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
+You've been invoked to consult an external model through MidFlight's configured provider (Codex, Gemini, OpenCode, or Oz) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
 
 Supports text consultation, implementation delegation, and **video analysis** (scene breakdowns, ad review, quality checks).
 
@@ -108,6 +108,6 @@ When self-invoking, be transparent: tell the user you're consulting an external 
 
 ## Error handling
 
-- If the query script fails, tell the user what happened and suggest they check their config (`~/.config/mid-flight/config`) and that the provider CLI is installed and authenticated.
+- If the query script fails, tell the user what happened and suggest they check their config (`~/.config/mid-flight/config`) and that the selected provider CLI is installed and authenticated.
 - If the response is empty, note that the provider returned no response and suggest trying a different provider.
 - Never crash the session or leave the user hanging — always communicate what happened.
