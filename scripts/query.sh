@@ -3,7 +3,7 @@
 #
 # Reads a query file (context + question), wraps it with a system prompt
 # optimized for mid-development consultation, and routes to the configured
-# provider (Codex or Gemini). Response goes to stdout.
+# provider (Codex, Gemini, OpenCode, or Oz). Response goes to stdout.
 #
 # Usage: query.sh <query-file-path> [consult|implement]
 #        query.sh <video-file-or-url> video [prompt]
@@ -45,6 +45,12 @@ main() {
   # 5. Invoke the provider
   # 6. Validate and print the response
   load_config
+  if ! validate_config_state; then
+    error_exit \
+      "invalid config" \
+      "Error: MidFlight config is invalid.
+$(format_config_validation_issues)"
+  fi
   resolve_provider_for_mode "$MODE"
   ensure_provider_available "$provider"
   load_request_payload
