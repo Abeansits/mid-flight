@@ -3,7 +3,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mapfile -t shell_files < <(find "$ROOT_DIR/scripts" "$ROOT_DIR/tests" -name '*.sh' | sort)
+shell_files=()
+
+while IFS= read -r shell_file; do
+  shell_files+=("$shell_file")
+done < <(find "$ROOT_DIR/scripts" "$ROOT_DIR/tests" -name '*.sh' | sort)
 
 if command -v shellcheck >/dev/null 2>&1; then
   echo "==> shellcheck"
