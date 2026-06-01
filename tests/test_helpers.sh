@@ -36,8 +36,60 @@ run_query() {
   bash "$ROOT_DIR/scripts/query.sh" "$@"
 }
 
+run_cli() {
+  bash "$ROOT_DIR/bin/midflight" "$@"
+}
+
 run_check_config() {
   bash "$ROOT_DIR/scripts/check-config.sh" "$@"
+}
+
+# Stub the codex CLI: capture the prompt to $TEST_DIR/codex_prompt.txt and
+# write a canned response. Optional arg overrides the response text.
+write_codex_stub() {
+  local response="${1:-stub-codex-ok}"
+
+  cat > "$TEST_DIR/bin/codex" <<EOF
+#!/bin/bash
+set -euo pipefail
+output_file=""
+prompt=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o|--output-last-message) output_file="\$2"; shift 2 ;;
+    --model|-c) shift 2 ;;
+    --full-auto|--skip-git-repo-check) shift ;;
+    *) prompt="\$1"; shift ;;
+  esac
+done
+printf '%s' "\$prompt" > "$TEST_DIR/codex_prompt.txt"
+printf '%s\n' "$response" > "\$output_file"
+EOF
+  chmod +x "$TEST_DIR/bin/codex"
+}
+
+# Stub the gemini CLI: capture the prompt to $TEST_DIR/gemini_prompt.txt and
+# write a canned response to stdout. Optional arg overrides the response text.
+write_gemini_stub() {
+  local response="${1:-stub-gemini-ok}"
+
+  cat > "$TEST_DIR/bin/gemini" <<EOF
+#!/bin/bash
+set -euo pipefail
+prompt=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -p) prompt="\$2"; shift 2 ;;
+    -m|--include-directories) shift 2 ;;
+    --sandbox|--output-format) shift ;;
+    text) shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "\$prompt" > "$TEST_DIR/gemini_prompt.txt"
+printf '%s\n' "$response"
+EOF
+  chmod +x "$TEST_DIR/bin/gemini"
 }
 
 assert_eq() {

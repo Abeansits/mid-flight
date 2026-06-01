@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "On-demand consultation with Codex, Gemini, OpenCode, or Oz at any point during development",
-    "version": "1.5.0"
+    "version": "1.6.0"
   },
   "plugins": [{
     "name": "mid-flight",

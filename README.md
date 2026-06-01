@@ -170,6 +170,67 @@ For Oz specifically, `auto` is a good default for general MidFlight use. If you 
 /midflight-check-config
 ```
 
+## Standalone CLI (use outside Claude Code)
+
+The same engine that powers `/midflight` ships as a plain CLI, so you can get a
+second opinion from a terminal, a script, or CI — no Claude Code required.
+Inside Claude Code, the slash command summarizes the session for you; from the
+terminal, you supply the question (and optionally the context) yourself.
+
+### Install
+
+`bin/midflight` is a self-contained wrapper over `scripts/query.sh`. Put it on
+your `PATH` — a symlink keeps it pointed at the repo:
+
+```bash
+ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight
+```
+
+It reads the same `~/.config/mid-flight/config` and provider CLIs as the plugin
+(see [Config](#config) and [Requirements](#requirements)).
+
+### Usage
+
+```bash
+# Ask a question (defaults to consult mode)
+midflight "should we use SSE or WebSockets for real-time updates?"
+
+# Override the configured provider for one call
+midflight -p gemini "is this regex vulnerable to ReDoS?"
+
+# Fold a context file and matching source files into the question
+midflight --context notes.md --include "src/*.ts" "where is the leak?"
+
+# Delegate a precise change
+midflight -m implement -f request.md
+
+# Analyze a local or remote video (forces Gemini)
+midflight --video ./ad-v3.mp4 "does this match the storyboard?"
+
+# Send a pre-built query file straight to the engine
+midflight -f query.md
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m, --mode MODE` | `consult` (default), `implement`, or `video` |
+| `-p, --provider NAME` | Override the configured provider (`codex`, `gemini`, `opencode`, `oz`) |
+| `-c, --config FILE` | Use an alternate config file |
+| `-f, --query-file FILE` | Send a pre-built query file straight to the engine |
+| `--context FILE` | File whose contents become the Context section |
+| `-i, --include GLOB` | Read matching files into the Context section (repeatable) |
+| `--video FILE\|URL` | Analyze a video (forces video mode + Gemini) |
+| `-h, --help` | Show help |
+| `-V, --version` | Show version |
+
+Run `midflight --help` for the full reference, or see
+[docs/standalone-usage.md](docs/standalone-usage.md).
+
+This is the standalone front door only — the Claude Code plugin behavior is
+unchanged. The terminal CLI does not auto-summarize your working context the
+way the `/midflight` slash command does; you provide the question and any
+context you want included.
+
 ## Updating
 
 ```bash
