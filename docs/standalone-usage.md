@@ -49,6 +49,8 @@ midflight [OPTIONS] [QUESTION...]
       --context FILE     file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
       --video FILE|URL   analyze a video (forces video mode + Gemini)
+      --timeout SECONDS  hard bound on provider call (default off; N>0 enables
+                         portable watchdog + pg kill, no coreutils needed)
   -h, --help             show help
   -V, --version          show version
 ```

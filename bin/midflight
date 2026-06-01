@@ -57,6 +57,9 @@ Options:
       --context FILE      file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
       --video FILE|URL    analyze a video (forces video mode + Gemini)
+      --timeout SECONDS   hard bound on the provider call (default: off/0; when N>0 the
+                          wrapper owns a portable bash watchdog + process-group kill
+                          so provider children die too; no coreutils needed)
   -h, --help             show this help
   -V, --version          show version
 
@@ -72,14 +75,17 @@ see the project README for configuration details.
 EOF
 }
 
+# Explicit defaults for set -euo pipefail (nounset safety). Arrays use declare -a;
+# scalars initialized so [ -n "$VAR" ] and ${VAR} expansions never unbound.
+declare -a INCLUDES=()
+declare -a POSITIONAL=()
 MODE=""
 PROVIDER=""
 CONFIG_FILE=""
 QUERY_FILE=""
 CONTEXT_FILE=""
 VIDEO_SOURCE=""
-INCLUDES=()
-POSITIONAL=()
+TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -90,6 +96,7 @@ while [ $# -gt 0 ]; do
     --context)       CONTEXT_FILE="${2:-}"; shift 2 ;;
     -i|--include)    INCLUDES+=("${2:-}"); shift 2 ;;
     --video)         VIDEO_SOURCE="${2:-}"; shift 2 ;;
+    --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help)       usage; exit 0 ;;
     -V|--version)    version; exit 0 ;;
     --)              shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
@@ -107,9 +114,15 @@ case "$MODE" in
   *) die "invalid mode '$MODE' (expected consult, implement, or video)" ;;
 esac
 
+if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
+  die "invalid --timeout '$TIMEOUT' (non-negative integer seconds expected; 0 disables the bound)"
+fi
+[ "${TIMEOUT:-120}" -le 0 ] && TIMEOUT=0  # 0 = no timeout bound (user override)
+
 QUESTION="${POSITIONAL[*]:-}"
 
 WORKDIR=""
+# shellcheck disable=SC2329  # used via trap (shellcheck static analysis misses it)
 cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
@@ -160,16 +173,23 @@ build_config_home() {
 # mirroring the "## Context / ## Question" structure the plugin produces.
 # Sets QUERY_OUT to the assembled file path.
 build_query_file() {
-  local out="$WORKDIR/query.md" context="" pat file
+  # Separate locals + explicit array init for set -u safety (the previous
+  # combined "local ... pat file" + "local -a files=()" was mangling the
+  # array under nounset when the Context body executed).
+  local out="$WORKDIR/query.md"
+  local context=""
+  local pat=""
+  local file=""
   local fence='```'
-  local -a files=()
+  local -a files
+  files=()  # split decl-then-assign is the portable idiom for bash 3.2 + set -u + arrays in functions (combined local -a foo=() leaves the local uninitialized for ${} expansions on macOS)
 
   if [ -n "$CONTEXT_FILE" ]; then
     [ -f "$CONTEXT_FILE" ] || die "context file not found: $CONTEXT_FILE"
     context="$(cat "$CONTEXT_FILE")"
   fi
 
-  if [ "${#INCLUDES[@]}" -gt 0 ]; then
+  if [ "${#INCLUDES[@]:-0}" -gt 0 ]; then
     for pat in "${INCLUDES[@]}"; do
       [ -n "$pat" ] || continue
       # shellcheck disable=SC2086 # intentional glob expansion of the pattern
@@ -180,10 +200,10 @@ build_query_file() {
   fi
 
   {
-    if [ -n "$context" ] || [ "${#files[@]}" -gt 0 ]; then
+    if [ -n "$context" ] || [ "${#files[@]:-0}" -gt 0 ]; then
       printf '## Context\n'
       [ -n "$context" ] && printf '%s\n' "$context"
-      for file in "${files[@]}"; do
+      for file in ${files[@]+"${files[@]}"}; do
         printf '\n### %s\n%s\n%s\n%s\n' "$file" "$fence" "$(cat "$file")" "$fence"
       done
       printf '\n'
@@ -195,7 +215,47 @@ build_query_file() {
 }
 
 have_inline_input() {
-  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
+  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]:-0}" -gt 0 ]
+}
+
+# run_engine: invoke the engine (bash QUERY_SH ...) under an optional wall-time
+# bound owned by the wrapper. Uses portable pure-bash watchdog + process group
+# (set -m + kill -$pgid) so that provider children (codex etc that fork helpers)
+# are reliably reaped on timeout. Watchdog output redirected + explicit kill of
+# the sleeper to avoid "Terminated" noise on the happy path (even in scripts that
+# may have job monitoring).
+run_engine() {
+  local to="${TIMEOUT:-0}"
+  if [ "$to" -gt 0 ] 2>/dev/null; then
+    # Portable watchdog (no coreutils): own process group for children, clean
+    # kill on timeout, visible msg, nonzero exit, and no "Terminated" noise from
+    # *our* sleeper on happy path (redirect + explicit reap; engine may still
+    # print its own internal job noise when we nuke the provider call).
+    bash -c '
+      set -m
+      "$@" &
+      pg=$!
+      exec 3>&2
+      (
+        sleep '"$to"'
+        printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
+        kill -TERM -"$pg" 2>/dev/null || true
+        sleep 1
+        kill -9 -"$pg" 2>/dev/null || true
+        # Force the parent (-c) to die nonzero so caller sees failure even if
+        # the killed QUERY_SH script would have exited 0.
+        kill -TERM $PPID 2>/dev/null || true
+      ) 3>&2 >/dev/null 2>&1 &
+      k=$!
+      wait "$pg" 2>/dev/null || true
+      ec=$?
+      kill "$k" 2>/dev/null || true
+      wait "$k" 2>/dev/null || true
+      exit "$ec"
+    ' _ "$@"
+  else
+    "$@"
+  fi
 }
 
 # Determine engine arguments by mode.
@@ -203,7 +263,7 @@ declare -a engine_args
 if [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
   [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
-  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]; then
+  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]:-0}" -gt 0 ]; then
     die "--context/--include do not apply to video mode; pass the prompt inline"
   fi
   engine_args=("$VIDEO_SOURCE" "video")
@@ -224,7 +284,10 @@ fi
 if [ -n "$PROVIDER" ] || [ -n "$CONFIG_FILE" ]; then
   CONFIG_HOME=""
   build_config_home
-  HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"
+  ec=$?
 else
-  bash "$QUERY_SH" "${engine_args[@]}"
+  run_engine bash "$QUERY_SH" "${engine_args[@]}"
+  ec=$?
 fi
+exit "${ec:-0}"
