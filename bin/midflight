@@ -189,7 +189,7 @@ build_query_file() {
     context="$(cat "$CONTEXT_FILE")"
   fi
 
-  if [ "${#INCLUDES[@]:-0}" -gt 0 ]; then
+  if [ "${#INCLUDES[@]}" -gt 0 ]; then
     for pat in "${INCLUDES[@]}"; do
       [ -n "$pat" ] || continue
       # shellcheck disable=SC2086 # intentional glob expansion of the pattern
@@ -200,7 +200,7 @@ build_query_file() {
   fi
 
   {
-    if [ -n "$context" ] || [ "${#files[@]:-0}" -gt 0 ]; then
+    if [ -n "$context" ] || [ "${#files[@]}" -gt 0 ]; then
       printf '## Context\n'
       [ -n "$context" ] && printf '%s\n' "$context"
       for file in ${files[@]+"${files[@]}"}; do
@@ -215,7 +215,7 @@ build_query_file() {
 }
 
 have_inline_input() {
-  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]:-0}" -gt 0 ]
+  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
 }
 
 # run_engine: invoke the engine (bash QUERY_SH ...) under an optional wall-time
@@ -263,7 +263,7 @@ declare -a engine_args
 if [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
   [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
-  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]:-0}" -gt 0 ]; then
+  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]; then
     die "--context/--include do not apply to video mode; pass the prompt inline"
   fi
   engine_args=("$VIDEO_SOURCE" "video")
