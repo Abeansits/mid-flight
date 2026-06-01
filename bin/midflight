@@ -122,7 +122,7 @@ fi
 QUESTION="${POSITIONAL[*]:-}"
 
 WORKDIR=""
-# shellcheck disable=SC2329  # used via trap (shellcheck static analysis misses it)
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via trap (codes vary by shellcheck version)
 cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
