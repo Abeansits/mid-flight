@@ -1,0 +1,293 @@
+#!/usr/bin/env bash
+# Standalone CLI front door for MidFlight.
+#
+# Wraps the existing engine (scripts/query.sh) so MidFlight works outside
+# Claude Code — from a terminal, a script, or CI. The engine is unchanged:
+# this wrapper only does friendly arg parsing and assembles a query file from
+# an inline question (+ optional context/included files) before handing off.
+#
+# Usage: midflight --help
+
+set -euo pipefail
+
+# Resolve the real location of this script, following symlinks, so the engine
+# is found relative to the install location rather than $PWD (works on PATH).
+resolve_self() {
+  local source="${BASH_SOURCE[0]}" dir
+  while [ -L "$source" ]; do
+    dir="$(cd -P "$(dirname "$source")" && pwd)"
+    source="$(readlink "$source")"
+    [[ "$source" != /* ]] && source="$dir/$source"
+  done
+  cd -P "$(dirname "$source")" && pwd
+}
+
+BIN_DIR="$(resolve_self)"
+PROJECT_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+QUERY_SH="$PROJECT_ROOT/scripts/query.sh"
+PLUGIN_JSON="$PROJECT_ROOT/.claude-plugin/plugin.json"
+
+die() {
+  printf 'midflight: %s\n' "$1" >&2
+  exit "${2:-2}"
+}
+
+version() {
+  local v=""
+  if [ -f "$PLUGIN_JSON" ]; then
+    v="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$PLUGIN_JSON" | head -1)"
+  fi
+  printf 'midflight %s\n' "${v:-unknown}"
+}
+
+usage() {
+  cat <<'EOF'
+midflight — consult Codex, Gemini, OpenCode, or Oz from any terminal.
+
+Usage:
+  midflight [OPTIONS] [QUESTION...]
+  midflight --video FILE|URL [QUESTION...]
+  midflight -f QUERY_FILE [OPTIONS]
+
+Options:
+  -m, --mode MODE        consult | implement | video   (default: consult)
+  -p, --provider NAME    codex | gemini | opencode | oz (overrides config)
+  -c, --config FILE      use an alternate config file
+  -f, --query-file FILE  send a pre-built query file straight to the engine
+      --context FILE      file whose contents become the Context section
+  -i, --include GLOB     read matching files into the Context section (repeatable)
+      --video FILE|URL    analyze a video (forces video mode + Gemini)
+      --timeout SECONDS   hard bound on the provider call (default: off/0; when N>0 the
+                          wrapper owns a portable bash watchdog + process-group kill
+                          so provider children die too; no coreutils needed)
+  -h, --help             show this help
+  -V, --version          show version
+
+Examples:
+  midflight "should we use SSE or WebSockets here?"
+  midflight -p gemini "is this regex safe against ReDoS?"
+  midflight --context notes.md -i "src/*.ts" "where is the leak?"
+  midflight -m implement -f request.md
+  midflight --video ./ad.mp4 "does this match the storyboard?"
+
+The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
+see the project README for configuration details.
+EOF
+}
+
+# Explicit defaults for set -euo pipefail (nounset safety). Arrays use declare -a;
+# scalars initialized so [ -n "$VAR" ] and ${VAR} expansions never unbound.
+declare -a INCLUDES=()
+declare -a POSITIONAL=()
+MODE=""
+PROVIDER=""
+CONFIG_FILE=""
+QUERY_FILE=""
+CONTEXT_FILE=""
+VIDEO_SOURCE=""
+TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -m|--mode)       MODE="${2:-}"; shift 2 ;;
+    -p|--provider)   PROVIDER="${2:-}"; shift 2 ;;
+    -c|--config)     CONFIG_FILE="${2:-}"; shift 2 ;;
+    -f|--query-file) QUERY_FILE="${2:-}"; shift 2 ;;
+    --context)       CONTEXT_FILE="${2:-}"; shift 2 ;;
+    -i|--include)    INCLUDES+=("${2:-}"); shift 2 ;;
+    --video)         VIDEO_SOURCE="${2:-}"; shift 2 ;;
+    --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
+    -h|--help)       usage; exit 0 ;;
+    -V|--version)    version; exit 0 ;;
+    --)              shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
+    -*)              die "unknown option: $1" ;;
+    *)               POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+# --video implies video mode; otherwise default to consult.
+[ -n "$VIDEO_SOURCE" ] && MODE="video"
+[ -z "$MODE" ] && MODE="consult"
+
+case "$MODE" in
+  consult|implement|video) ;;
+  *) die "invalid mode '$MODE' (expected consult, implement, or video)" ;;
+esac
+
+if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
+  die "invalid --timeout '$TIMEOUT' (non-negative integer seconds expected; 0 disables the bound)"
+fi
+[ "${TIMEOUT:-120}" -le 0 ] && TIMEOUT=0  # 0 = no timeout bound (user override)
+
+QUESTION="${POSITIONAL[*]:-}"
+
+WORKDIR=""
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via trap (codes vary by shellcheck version)
+cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
+trap cleanup EXIT
+WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
+
+# Symlink each entry of src into dest, skipping one name. Lets the temp config
+# home mirror the real home so passthrough still resolves there.
+mirror_dir() {
+  local src="$1" dest="$2" skip="$3" entry base
+  [ -d "$src" ] || return 0
+  for entry in "$src"/* "$src"/.[!.]*; do
+    [ -e "$entry" ] || continue
+    base="${entry##*/}"
+    [ "$base" = "$skip" ] && continue
+    ln -s "$entry" "$dest/$base"
+  done
+}
+
+# Build a temporary config home so -p/-c can override config without touching
+# the engine or the user's real config. The engine only reads $HOME for the
+# config file, but provider CLIs read $HOME for their own auth, so the real
+# home's contents are symlinked through; only the mid-flight config is replaced.
+build_config_home() {
+  local home_dir="$WORKDIR/home"
+  mkdir -p "$home_dir/.config/mid-flight"
+  mirror_dir "$HOME" "$home_dir" ".config"
+  mirror_dir "$HOME/.config" "$home_dir/.config" "mid-flight"
+
+  local config="$home_dir/.config/mid-flight/config"
+  if [ -n "$CONFIG_FILE" ]; then
+    [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
+    cp "$CONFIG_FILE" "$config"
+  elif [ -f "$HOME/.config/mid-flight/config" ]; then
+    cp "$HOME/.config/mid-flight/config" "$config"
+  else
+    : > "$config"
+  fi
+
+  if [ -n "$PROVIDER" ]; then
+    grep -v '^provider=' "$config" > "$config.tmp" 2>/dev/null || true
+    printf 'provider=%s\n' "$PROVIDER" >> "$config.tmp"
+    mv "$config.tmp" "$config"
+  fi
+
+  CONFIG_HOME="$home_dir"
+}
+
+# Assemble an inline question (+ optional context/includes) into a query file,
+# mirroring the "## Context / ## Question" structure the plugin produces.
+# Sets QUERY_OUT to the assembled file path.
+build_query_file() {
+  # Separate locals + explicit array init for set -u safety (the previous
+  # combined "local ... pat file" + "local -a files=()" was mangling the
+  # array under nounset when the Context body executed).
+  local out="$WORKDIR/query.md"
+  local context=""
+  local pat=""
+  local file=""
+  local fence='```'
+  local -a files
+  files=()  # split decl-then-assign is the portable idiom for bash 3.2 + set -u + arrays in functions (combined local -a foo=() leaves the local uninitialized for ${} expansions on macOS)
+
+  if [ -n "$CONTEXT_FILE" ]; then
+    [ -f "$CONTEXT_FILE" ] || die "context file not found: $CONTEXT_FILE"
+    context="$(cat "$CONTEXT_FILE")"
+  fi
+
+  if [ "${#INCLUDES[@]}" -gt 0 ]; then
+    for pat in "${INCLUDES[@]}"; do
+      [ -n "$pat" ] || continue
+      # shellcheck disable=SC2086 # intentional glob expansion of the pattern
+      for file in $pat; do
+        [ -f "$file" ] && files+=("$file")
+      done
+    done
+  fi
+
+  {
+    if [ -n "$context" ] || [ "${#files[@]}" -gt 0 ]; then
+      printf '## Context\n'
+      [ -n "$context" ] && printf '%s\n' "$context"
+      for file in ${files[@]+"${files[@]}"}; do
+        printf '\n### %s\n%s\n%s\n%s\n' "$file" "$fence" "$(cat "$file")" "$fence"
+      done
+      printf '\n'
+    fi
+    printf '## Question\n%s\n' "$QUESTION"
+  } > "$out"
+
+  QUERY_OUT="$out"
+}
+
+have_inline_input() {
+  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
+}
+
+# run_engine: invoke the engine (bash QUERY_SH ...) under an optional wall-time
+# bound owned by the wrapper. Uses portable pure-bash watchdog + process group
+# (set -m + kill -$pgid) so that provider children (codex etc that fork helpers)
+# are reliably reaped on timeout. Watchdog output redirected + explicit kill of
+# the sleeper to avoid "Terminated" noise on the happy path (even in scripts that
+# may have job monitoring).
+run_engine() {
+  local to="${TIMEOUT:-0}"
+  if [ "$to" -gt 0 ] 2>/dev/null; then
+    # Portable watchdog (no coreutils): own process group for children, clean
+    # kill on timeout, visible msg, nonzero exit, and no "Terminated" noise from
+    # *our* sleeper on happy path (redirect + explicit reap; engine may still
+    # print its own internal job noise when we nuke the provider call).
+    bash -c '
+      set -m
+      "$@" &
+      pg=$!
+      exec 3>&2
+      (
+        sleep '"$to"'
+        printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
+        kill -TERM -"$pg" 2>/dev/null || true
+        sleep 1
+        kill -9 -"$pg" 2>/dev/null || true
+        # Force the parent (-c) to die nonzero so caller sees failure even if
+        # the killed QUERY_SH script would have exited 0.
+        kill -TERM $PPID 2>/dev/null || true
+      ) 3>&2 >/dev/null 2>&1 &
+      k=$!
+      wait "$pg" 2>/dev/null || true
+      ec=$?
+      kill "$k" 2>/dev/null || true
+      wait "$k" 2>/dev/null || true
+      exit "$ec"
+    ' _ "$@"
+  else
+    "$@"
+  fi
+}
+
+# Determine engine arguments by mode.
+declare -a engine_args
+if [ "$MODE" = "video" ]; then
+  [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
+  [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
+  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]; then
+    die "--context/--include do not apply to video mode; pass the prompt inline"
+  fi
+  engine_args=("$VIDEO_SOURCE" "video")
+  [ -n "$QUESTION" ] && engine_args+=("$QUESTION")
+elif [ -n "$QUERY_FILE" ]; then
+  [ -f "$QUERY_FILE" ] || die "query file not found: $QUERY_FILE"
+  if have_inline_input; then
+    die "--query-file cannot be combined with an inline question, --context, or --include"
+  fi
+  engine_args=("$QUERY_FILE" "$MODE")
+else
+  have_inline_input || die "no question provided (give a QUESTION, --query-file, or --video)"
+  QUERY_OUT=""
+  build_query_file
+  engine_args=("$QUERY_OUT" "$MODE")
+fi
+
+if [ -n "$PROVIDER" ] || [ -n "$CONFIG_FILE" ]; then
+  CONFIG_HOME=""
+  build_config_home
+  HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"
+  ec=$?
+else
+  run_engine bash "$QUERY_SH" "${engine_args[@]}"
+  ec=$?
+fi
+exit "${ec:-0}"
