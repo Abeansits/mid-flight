@@ -33,9 +33,6 @@ while [ \$# -gt 0 ]; do
       include_dir="\$2"
       shift 2
       ;;
-    --sandbox)
-      shift
-      ;;
     --output-format)
       shift 2
       ;;
