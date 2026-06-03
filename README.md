@@ -117,7 +117,7 @@ Create `~/.config/mid-flight/config` to override defaults:
 
 ```
 provider=codex
-codex_model=gpt-5.3-codex
+codex_model=gpt-5.4
 codex_reasoning_effort=high
 gemini_model=gemini-2.5-pro
 opencode_model=
@@ -131,7 +131,7 @@ oz_profile=
 | Setting                  | Default          | Description |
 |--------------------------|------------------|-------------|
 | `provider`               | `codex`          | Query provider (`codex`, `gemini`, `opencode`, or `oz`) |
-| `codex_model`            | `gpt-5.3-codex`  | Codex model to use |
+| `codex_model`            | `gpt-5.4`        | Codex model to use |
 | `codex_reasoning_effort` | `high`           | Codex reasoning effort (`low`, `medium`, `high`) |
 | `gemini_model`           | `gemini-2.5-pro` | Gemini model to use |
 | `opencode_model`         | unset            | OpenCode model to use; leave blank to use the CLI default |
@@ -306,7 +306,7 @@ MidFlight explicitly detaches stdin before launching provider CLIs. This avoids 
 
 ### Video analysis
 
-Video mode accepts local files or URLs. Local files are copied to a temp staging directory and passed to Gemini CLI using the `@path` inline syntax. URLs are passed directly in the prompt — Gemini handles fetching natively. Local files are sandboxed: the staging dir is the only path exposed via `--include-directories`, so the parent directory is never accessible to Gemini. The staging dir is cleaned up on exit. Gemini CLI enforces a 20MB limit on inline files; the script validates this upfront.
+Video mode accepts local files or URLs. Local files are copied to a temp staging directory and passed to Gemini CLI using the `@path` inline syntax. URLs are passed directly in the prompt and Gemini handles fetching natively. When a local file is staged, MidFlight passes that staging directory via `--include-directories` so Gemini can resolve the inline file reference. The staging dir is cleaned up on exit. Gemini CLI enforces a 20MB limit on inline files; the script validates this upfront.
 
 ### Self-invocation
 

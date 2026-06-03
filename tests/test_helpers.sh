@@ -81,8 +81,7 @@ while [ \$# -gt 0 ]; do
   case "\$1" in
     -p) prompt="\$2"; shift 2 ;;
     -m|--include-directories) shift 2 ;;
-    --sandbox|--output-format) shift ;;
-    text) shift ;;
+    --output-format) shift 2 ;;
     *) shift ;;
   esac
 done

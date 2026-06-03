@@ -117,10 +117,10 @@ query_gemini() {
   local full_prompt="$1"
   local output_file="$2"
   local include_dir="${3:-}"
-  local sandbox_args=(--sandbox)
+  local include_args=()
 
   if [ -n "$include_dir" ]; then
-    sandbox_args+=(--include-directories "$include_dir")
+    include_args+=(--include-directories "$include_dir")
   fi
 
   prepare_provider_run \
@@ -131,7 +131,7 @@ query_gemini() {
   gemini \
     -p "$full_prompt" \
     -m "$gemini_model" \
-    "${sandbox_args[@]}" \
+    ${include_args[@]+"${include_args[@]}"} \
     --output-format text \
     > "$output_file" \
     2> "$PROVIDER_LOG_FILE"
