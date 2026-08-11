@@ -44,6 +44,7 @@ midflight [OPTIONS] [QUESTION...]
 
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | opencode | oz (overrides config)
+      --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
@@ -63,6 +64,9 @@ midflight "should we use SSE or WebSockets for real-time updates?"
 
 # Override the provider for a single call
 midflight -p gemini "is this regex vulnerable to ReDoS?"
+
+# Override both provider and model
+midflight -p gemini --model gemini-2.5-flash "quick take on this approach"
 
 # Include context + source files
 midflight --context recent-debug.md --include "src/**/*.ts" \
@@ -95,11 +99,19 @@ midflight -f query.md
 
 ## Provider and config overrides
 
-`-p/--provider` and `-c/--config` let you change the provider or config for a
-single call without editing your real config. The wrapper composes an effective
-config in a temporary home and points the engine at it, while symlinking the
-rest of your home directory through so provider CLIs keep their authentication.
+`-p/--provider`, `--model`, and `-c/--config` let you change the provider, model,
+or config for a single call without editing your real config. The wrapper composes
+an effective config in a temporary home and points the engine at it, while symlinking
+the rest of your home directory through so provider CLIs keep their authentication.
 Your `~/.config/mid-flight/config` is never modified.
+
+`--model` maps to the appropriate config key based on the active provider:
+- `-p codex --model gpt-5` → sets `codex_model`
+- `-p gemini --model gemini-2.5-flash` → sets `gemini_model`
+- `--model gemini-2.5-flash` (no `-p`) → sets the model for whatever provider is
+  active in your config
+- `--video clip.mp4 --model gemini-2.5-flash` → sets `gemini_model`; video mode
+  always runs on Gemini, so the override follows it there
 
 ## Exit codes
 
