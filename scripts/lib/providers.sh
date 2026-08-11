@@ -102,10 +102,12 @@ query_codex() {
     "codex.log" \
     "Error: Codex query failed. Make sure the Codex CLI is installed and authenticated."
 
+  # workspace-write is required: `codex exec` sandboxes to read-only by default,
+  # which blocks implement mode from applying the edits it is asked to make.
   codex exec \
     --model "$codex_model" \
     -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
-    --full-auto \
+    --sandbox workspace-write \
     --skip-git-repo-check \
     -o "$output_file" \
     "$full_prompt" \

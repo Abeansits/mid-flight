@@ -25,7 +25,8 @@ prompt=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o|--output-last-message) output_file="$2"; shift 2 ;;
-    --model|-c|--full-auto|--skip-git-repo-check) shift 2 ;;
+    --model|-c|--sandbox) shift 2 ;;
+    --skip-git-repo-check) shift ;;
     *) prompt="$1"; shift ;;
   esac
 done

@@ -26,10 +26,10 @@ while [ $# -gt 0 ]; do
       output_file="$2"
       shift 2
       ;;
-    --model|-c)
+    --model|-c|--sandbox)
       shift 2
       ;;
-    --full-auto|--skip-git-repo-check)
+    --skip-git-repo-check)
       shift
       ;;
     *)
