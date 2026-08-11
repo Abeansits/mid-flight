@@ -258,6 +258,7 @@ If you want to validate your setup before running a real consult, use `/midfligh
 | `'opencode' CLI not found` | OpenCode CLI not installed or not in PATH | Install from [opencode.ai/docs/cli](https://opencode.ai/docs/cli/) |
 | `'oz' CLI not found` | Oz CLI not installed or not in PATH | Install from [docs.warp.dev/reference/cli/cli](https://docs.warp.dev/reference/cli/cli) |
 | `Codex query failed` | Auth issue or network error | Run `codex --version` to verify install, check API key |
+| `Codex query failed` with `error: unexpected argument '--flag' found` in the details | Installed Codex CLI no longer accepts a flag MidFlight passes (e.g. `--full-auto`, removed in codex-cli 0.147.0) | Upgrade MidFlight; the failure is a CLI contract mismatch, not an auth problem |
 | `OpenCode query failed` | Auth issue or provider error | Run `opencode --help` to verify install and confirm your provider credentials inside OpenCode |
 | `Oz query failed` | Auth issue or provider error | Run `oz --help` or `oz whoami` to verify install and authentication |
 | `Empty response` | Provider returned nothing | Try again or switch providers in config |

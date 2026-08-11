@@ -21,16 +21,18 @@ set -euo pipefail
 output_file=""
 prompt=""
 
+printf '%s\n' "\$@" > "$TEST_DIR/codex_args.txt"
+
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -o|--output-last-message)
       output_file="\$2"
       shift 2
       ;;
-    --model|-c)
+    --model|-c|--sandbox)
       shift 2
       ;;
-    --full-auto|--skip-git-repo-check)
+    --skip-git-repo-check)
       shift
       ;;
     *)
@@ -66,4 +68,18 @@ assert_contains "$(cat "$TEST_DIR/codex_prompt.txt")" \
   "Should we extract prompt files?" \
   "consult prompt should include the query body"
 
-echo "PASS: consult mode routes through codex with the expected prompt"
+# `codex exec` sandboxes to read-only by default, and dropped --full-auto in
+# codex-cli 0.147.0; both regressions look like a working call that cannot write.
+CODEX_ARGS="$(cat "$TEST_DIR/codex_args.txt")"
+
+assert_contains "$CODEX_ARGS" "--sandbox" \
+  "codex invocation should request an explicit sandbox mode"
+assert_contains "$CODEX_ARGS" "workspace-write" \
+  "codex sandbox mode should be workspace-write"
+
+if [[ "$CODEX_ARGS" == *"--full-auto"* ]]; then
+  echo "FAIL: codex invocation must not pass --full-auto (removed in codex-cli 0.147.0)" >&2
+  exit 1
+fi
+
+echo "PASS: consult mode routes through codex with the expected prompt and sandbox flags"
