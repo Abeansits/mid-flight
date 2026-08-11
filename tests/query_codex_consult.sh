@@ -72,9 +72,9 @@ assert_contains "$(cat "$TEST_DIR/codex_prompt.txt")" \
 # codex-cli 0.147.0; both regressions look like a working call that cannot write.
 CODEX_ARGS="$(cat "$TEST_DIR/codex_args.txt")"
 
-assert_contains "$CODEX_ARGS" "--sandbox" \
-  "codex invocation should request an explicit sandbox mode"
-assert_contains "$CODEX_ARGS" "workspace-write" \
+# One arg per line, so adjacent lines assert `--sandbox workspace-write` as a pair:
+# a mode of read-only, or the value merely appearing elsewhere in argv, must fail.
+assert_contains "$CODEX_ARGS" $'--sandbox\nworkspace-write' \
   "codex sandbox mode should be workspace-write"
 
 if [[ "$CODEX_ARGS" == *"--full-auto"* ]]; then
