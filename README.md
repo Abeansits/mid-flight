@@ -111,6 +111,20 @@ claude plugin install mid-flight@mid-flight
 
 Restart Claude Code after installing.
 
+## Releasing
+
+MidFlight releases work best as a two-step flow:
+
+1. Run `scripts/release.sh prepare X.Y.Z` on your working branch. This bumps
+   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, then
+   creates a release-version commit for the PR.
+2. Merge that PR, switch to local `main`, and run
+   `scripts/release.sh publish X.Y.Z`.
+
+`publish` intentionally refuses to run unless local `main` is clean and fully
+up to date with `origin/main`. Tag from a clean `main`, not from a feature
+branch or a dirty checkout.
+
 ## Config
 
 Create `~/.config/mid-flight/config` to override defaults:
