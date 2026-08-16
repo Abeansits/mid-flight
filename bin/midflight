@@ -52,6 +52,7 @@ Usage:
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | opencode | oz (overrides config)
+      --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
@@ -66,6 +67,7 @@ Options:
 Examples:
   midflight "should we use SSE or WebSockets here?"
   midflight -p gemini "is this regex safe against ReDoS?"
+  midflight -p gemini --model gemini-2.5-flash "quick take on this approach"
   midflight --context notes.md -i "src/*.ts" "where is the leak?"
   midflight -m implement -f request.md
   midflight --video ./ad.mp4 "does this match the storyboard?"
@@ -81,6 +83,7 @@ declare -a INCLUDES=()
 declare -a POSITIONAL=()
 MODE=""
 PROVIDER=""
+MODEL=""
 CONFIG_FILE=""
 QUERY_FILE=""
 CONTEXT_FILE=""
@@ -91,6 +94,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -m|--mode)       MODE="${2:-}"; shift 2 ;;
     -p|--provider)   PROVIDER="${2:-}"; shift 2 ;;
+    --model)         MODEL="${2:-}"; shift 2 ;;
     -c|--config)     CONFIG_FILE="${2:-}"; shift 2 ;;
     -f|--query-file) QUERY_FILE="${2:-}"; shift 2 ;;
     --context)       CONTEXT_FILE="${2:-}"; shift 2 ;;
@@ -163,6 +167,31 @@ build_config_home() {
   if [ -n "$PROVIDER" ]; then
     grep -v '^provider=' "$config" > "$config.tmp" 2>/dev/null || true
     printf 'provider=%s\n' "$PROVIDER" >> "$config.tmp"
+    mv "$config.tmp" "$config"
+  fi
+
+  if [ -n "$MODEL" ]; then
+    local effective_provider="$PROVIDER"
+    # Video mode always runs on gemini, so the override must land on
+    # gemini_model no matter what the config or -p says.
+    if [ "$MODE" = "video" ]; then
+      effective_provider="gemini"
+    elif [ -z "$effective_provider" ]; then
+      effective_provider="$(grep '^provider=' "$config" | cut -d= -f2 | tr -d '[:space:]')"
+    fi
+    [ -z "$effective_provider" ] && effective_provider="codex"
+
+    local model_key=""
+    case "$effective_provider" in
+      codex)    model_key="codex_model" ;;
+      gemini)   model_key="gemini_model" ;;
+      opencode) model_key="opencode_model" ;;
+      oz)       model_key="oz_model" ;;
+      *)        die "unknown provider '$effective_provider' for --model mapping" ;;
+    esac
+
+    grep -v "^${model_key}=" "$config" > "$config.tmp" 2>/dev/null || true
+    printf '%s=%s\n' "$model_key" "$MODEL" >> "$config.tmp"
     mv "$config.tmp" "$config"
   fi
 
@@ -281,7 +310,7 @@ else
   engine_args=("$QUERY_OUT" "$MODE")
 fi
 
-if [ -n "$PROVIDER" ] || [ -n "$CONFIG_FILE" ]; then
+if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
   CONFIG_HOME=""
   build_config_home
   HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"

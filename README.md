@@ -198,6 +198,9 @@ midflight "should we use SSE or WebSockets for real-time updates?"
 # Override the configured provider for one call
 midflight -p gemini "is this regex vulnerable to ReDoS?"
 
+# Override the model for the active provider
+midflight -p gemini --model gemini-2.5-flash "quick take on this approach"
+
 # Fold a context file and matching source files into the question
 midflight --context notes.md --include "src/*.ts" "where is the leak?"
 
@@ -215,6 +218,7 @@ midflight -f query.md
 |--------|-------------|
 | `-m, --mode MODE` | `consult` (default), `implement`, or `video` |
 | `-p, --provider NAME` | Override the configured provider (`codex`, `gemini`, `opencode`, `oz`) |
+| `--model MODEL` | Override the model for the active provider |
 | `-c, --config FILE` | Use an alternate config file |
 | `-f, --query-file FILE` | Send a pre-built query file straight to the engine |
 | `--context FILE` | File whose contents become the Context section |
