@@ -16,6 +16,7 @@ provider_display_name() {
   case "$1" in
     codex) printf '%s\n' "Codex" ;;
     gemini) printf '%s\n' "Gemini" ;;
+    agy|antigravity) printf '%s\n' "Antigravity" ;;
     opencode) printf '%s\n' "OpenCode" ;;
     oz) printf '%s\n' "Oz" ;;
     *) printf '%s\n' "$1" ;;
@@ -139,6 +140,40 @@ query_gemini() {
     2> "$PROVIDER_LOG_FILE"
 }
 
+query_agy() {
+  local full_prompt="$1"
+  local output_file="$2"
+  local include_dir="${3:-}"
+  local args=(-p "$full_prompt" --output-format text)
+
+  prepare_provider_run \
+    "agy" \
+    "agy.log" \
+    "Error: Antigravity query failed. Make sure the Antigravity CLI (agy) is installed and authenticated."
+
+  if [ -n "$agy_model" ]; then
+    args+=(--model "$agy_model")
+  fi
+
+  if [ -n "$agy_effort" ]; then
+    args+=(--effort "$agy_effort")
+  fi
+
+  if [ -n "$include_dir" ]; then
+    args+=(--add-dir "$include_dir")
+  fi
+
+  # Headless agy soft-denies writes unless permissions are skipped.
+  # Consult/video stay gated; implement is the only mode that must edit files.
+  if [ "${MODE:-}" = "implement" ]; then
+    args+=(--dangerously-skip-permissions)
+  fi
+
+  agy "${args[@]}" \
+    > "$output_file" \
+    2> "$PROVIDER_LOG_FILE"
+}
+
 query_opencode() {
   local full_prompt="$1"
   local output_file="$2"
@@ -204,6 +239,9 @@ run_provider_command() {
     gemini)
       query_gemini "$full_prompt" "$output_file" "$include_dir"
       ;;
+    agy)
+      query_agy "$full_prompt" "$output_file" "$include_dir"
+      ;;
     opencode)
       query_opencode "$full_prompt" "$output_file"
       ;;
@@ -213,7 +251,7 @@ run_provider_command() {
     *)
       error_exit \
         "unknown provider: $provider_name" \
-        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, opencode, oz. Check ~/.config/mid-flight/config"
+        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz. Check ~/.config/mid-flight/config"
       ;;
   esac
 }

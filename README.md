@@ -2,7 +2,7 @@
 
 **Get a second opinion from another coding agent without leaving the one you're already in.**
 
-You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, or Gemini, then brings their answer back into your session.
+You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, Antigravity, or Gemini, then brings their answer back into your session.
 
 No copy-paste. No rebuilding context. No switching tools.
 
@@ -36,7 +36,7 @@ Coding agents are strong, and they still get stuck in their own framing. MidFlig
 |---|---|
 | A sanity check before you commit to an approach | **Consult** — advice only, no file changes |
 | A precise, spec'd change done by another model | **Implement** — reads, edits, verifies |
-| Eyes on a local file or YouTube URL | **Video** — Gemini multimodal analysis |
+| Eyes on a local file or YouTube URL | **Video** — Antigravity or Gemini multimodal analysis |
 
 You don't pick the mode. MidFlight infers it from the question. Uncertain → consult (safe by default).
 
@@ -49,7 +49,8 @@ You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 - [Codex CLI](https://github.com/openai/codex) (default)
 - [OpenCode CLI](https://opencode.ai/docs/cli/)
 - [Oz CLI](https://docs.warp.dev/reference/cli/cli)
-- [Gemini CLI](https://github.com/google-gemini/gemini-cli) — video mode, and consult/implement if you still have access (see [Gemini note](#gemini-cli-status))
+- [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`) — Google's current terminal agent
+- [Gemini CLI](https://github.com/google-gemini/gemini-cli) — enterprise / paid API key only (see [Gemini note](#gemini-cli-status))
 
 ### 1. Claude Code plugin
 
@@ -79,7 +80,7 @@ midflight --version
 
 ```bash
 midflight "should we use SSE or WebSockets for real-time updates?"
-midflight -p opencode "is this regex vulnerable to ReDoS?"
+midflight -p agy "is this regex vulnerable to ReDoS?"
 midflight --context notes.md --include "src/*.ts" "where is the leak?"
 midflight -m implement -f request.md
 midflight --video ./ad-v3.mp4 "does this match the storyboard?"
@@ -92,23 +93,18 @@ Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).
 | Provider | Consult | Implement | Video | Model | Extra |
 |---|---|---|---|---|---|
 | `codex` | Yes | Yes | No | `codex_model` | `codex_reasoning_effort` |
+| `agy` | Yes | Yes | Yes | `agy_model` | `agy_effort` |
 | `opencode` | Yes | Yes | No | `opencode_model` | `opencode_variant`, `opencode_format` |
 | `oz` | Yes | Yes | No | `oz_model` | `oz_output_format`, `oz_profile` |
 | `gemini` | Yes | Yes | Yes | `gemini_model` | — |
 
-Video always routes to Gemini, regardless of your default provider.
+`provider=antigravity` is an alias for `agy`.
+
+Video uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
 
 ### Gemini CLI status
 
-On 18 June 2026, Google stopped serving **consumer** Gemini CLI requests (free, AI Pro, AI Ultra). Enterprise Code Assist licenses and paid Gemini API keys still work. The consumer replacement is [Antigravity CLI](https://antigravity.google/docs/cli/overview) (`agy`) — not wired into MidFlight yet.
-
-If `gemini` is your provider and queries start failing with auth/quota errors, switch:
-
-```
-provider=codex
-```
-
-or use OpenCode / Oz.
+On 18 June 2026, Google stopped serving **consumer** Gemini CLI requests (free, AI Pro, AI Ultra). Use `provider=agy` ([install](https://antigravity.google/docs/cli/install)). Keep `provider=gemini` only if you have an enterprise Code Assist license or a paid Gemini API key.
 
 ## Config
 
@@ -118,6 +114,8 @@ Create `~/.config/mid-flight/config` to override defaults:
 provider=codex
 codex_model=gpt-5.4
 codex_reasoning_effort=high
+agy_model=
+agy_effort=
 gemini_model=gemini-2.5-pro
 opencode_model=
 opencode_variant=high
@@ -129,10 +127,12 @@ oz_profile=
 
 | Setting | Default | Description |
 |---|---|---|
-| `provider` | `codex` | `codex`, `gemini`, `opencode`, or `oz` |
+| `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, or `oz` |
 | `codex_model` | `gpt-5.4` | Codex model |
 | `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
-| `gemini_model` | `gemini-2.5-pro` | Gemini model |
+| `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
+| `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
+| `gemini_model` | `gemini-2.5-pro` | Gemini model (enterprise / API-key path) |
 | `opencode_model` | unset | Leave blank for the OpenCode CLI default |
 | `opencode_variant` | `high` | e.g. `minimal`, `high`, `max` |
 | `opencode_format` | `default` | `default` or `json` |
@@ -158,11 +158,13 @@ Validate setup first: `/midflight-check-config` (plugin) or `bash scripts/check-
 | Error | Cause | Fix |
 |---|---|---|
 | `'codex' CLI not found` | Codex not installed / not on `PATH` | [Install Codex](https://github.com/openai/codex) |
-| `'gemini' CLI not found` | Gemini not installed / not on `PATH` | [Install Gemini CLI](https://github.com/google-gemini/gemini-cli) — consumer access ended 18 Jun 2026; see [Gemini note](#gemini-cli-status) |
+| `'agy' CLI not found` | Antigravity not installed / not on `PATH` | [Install agy](https://antigravity.google/docs/cli/install) |
+| `'gemini' CLI not found` | Gemini not installed / not on `PATH` | Consumer access ended 18 Jun 2026 — [install agy](https://antigravity.google/docs/cli/install), or Gemini with an enterprise/API-key install |
 | `'opencode' CLI not found` | OpenCode not installed / not on `PATH` | [Install OpenCode](https://opencode.ai/docs/cli/) |
 | `'oz' CLI not found` | Oz not installed / not on `PATH` | [Install Oz](https://docs.warp.dev/reference/cli/cli) |
 | `Codex query failed` | Auth or network | `codex --version`; check API key |
 | `Codex query failed` with `unexpected argument '--flag'` | Installed Codex CLI dropped a flag MidFlight still passes | Upgrade MidFlight; this is a CLI contract mismatch, not auth |
+| `Antigravity query failed` | Auth or provider error | `agy --version`; run `agy` once to sign in |
 | `OpenCode query failed` | Auth or provider error | `opencode --help`; confirm credentials inside OpenCode |
 | `Oz query failed` | Auth or provider error | `oz --help` or `oz whoami` |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
@@ -208,11 +210,11 @@ MidFlight is a thin router over other agents' CLIs.
 
 - **Host** — Claude Code (`/midflight`) or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
-- **Provider** — `codex`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
+- **Provider** — `codex`, `agy`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
 Each invocation gets its own temp run workspace for staged inputs, prompt assembly, provider logs, and response capture. Stdin is detached before launching provider CLIs so a caller with an open pipe cannot deadlock Codex.
 
-Video mode copies local files into a staging dir and passes them to Gemini via `@path` plus `--include-directories`. URLs go in the prompt as-is. Gemini enforces a 20MB inline-file limit; MidFlight checks size first.
+Video mode copies local files into a staging dir. Gemini gets `@path` plus `--include-directories`. Antigravity gets `--add-dir` and a plain path in the prompt (no `@path` syntax). URLs go in the prompt as-is. Gemini's 20MB inline-file limit is checked up front.
 
 </details>
 

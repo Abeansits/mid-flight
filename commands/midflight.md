@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: Consult Codex, Gemini, OpenCode, or Oz for a second opinion mid-development, or analyze video with Gemini
+description: Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini
 model: opus
 allowed-tools: Bash, Read, Glob, Grep, Write
 user-invocable: true
@@ -8,7 +8,7 @@ user-invocable: true
 
 # MidFlight — Mid-Development Consultation
 
-You've been invoked to consult an external model through MidFlight's configured provider (Codex, Gemini, OpenCode, or Oz) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
+You've been invoked to consult an external model through MidFlight's configured provider (Codex, Gemini, Antigravity, OpenCode, or Oz) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
 
 Supports text consultation, implementation delegation, and **video analysis** (scene breakdowns, ad review, quality checks).
 
@@ -27,7 +27,7 @@ Supports text consultation, implementation delegation, and **video analysis** (s
 
 3. **Classify intent** — Decide the mode based on the arguments:
 
-   - **`video`** — When `--video` flag is present. Always uses Gemini (multimodal required).
+   - **`video`** — When `--video` flag is present. Uses Antigravity (`agy`) if available, otherwise Gemini. If the configured provider is already `agy` or `gemini`, that choice is kept.
    - **`consult`** — Questions, tradeoff analysis, debugging help, architecture validation, "should we...", "what's the best way to...", or any request for advice/perspective. **When uncertain, default to consult.**
    - **`implement`** — Specific file changes with clear specs: "add X to file Y", "fix Z in W", complete code blocks with file paths. Only use this when the query contains precise, actionable implementation instructions.
 
@@ -84,7 +84,7 @@ Supports text consultation, implementation delegation, and **video analysis** (s
    Question: [the user's question about the video]"
    ```
 
-   **Note:** Video mode auto-switches to Gemini regardless of config. No need to check the provider.
+   **Note:** Video mode auto-switches to Antigravity or Gemini. No need to pick the provider unless you want to pin `agy` vs `gemini`.
 
 5. **Present the findings** — Share the external model's response with the user. Add your own analysis:
    - Where do you agree or disagree with the external model's assessment?

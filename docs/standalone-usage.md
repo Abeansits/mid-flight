@@ -1,8 +1,8 @@
 # Standalone CLI usage
 
 `bin/midflight` is a thin wrapper over MidFlight's engine (`scripts/query.sh`)
-that lets you consult Codex, Gemini, OpenCode, or Oz from any terminal, script,
-or CI job — without Claude Code.
+that lets you consult Codex, Gemini, Antigravity, OpenCode, or Oz from any
+terminal, script, or CI job — without Claude Code.
 
 The engine was always standalone; this wrapper just adds friendly argument
 parsing, help/version output, and inline-question assembly. The Claude Code
@@ -31,8 +31,8 @@ You can also run it in place with `./bin/midflight ...`.
 ### Prerequisites
 
 - `bash`
-- A provider CLI in `PATH` (`codex`, `gemini`, `opencode`, or `oz`), installed
-  and authenticated.
+- A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, or `oz`),
+  installed and authenticated.
 - Optionally `~/.config/mid-flight/config` to pick the provider and models.
   Without it, the engine's defaults apply (provider `codex`). See the
   [README config section](../README.md#config).
@@ -43,13 +43,13 @@ You can also run it in place with `./bin/midflight ...`.
 midflight [OPTIONS] [QUESTION...]
 
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | opencode | oz (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz (overrides config)
       --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
-      --video FILE|URL   analyze a video (forces video mode + Gemini)
+      --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
       --timeout SECONDS  hard bound on provider call (default off; N>0 enables
                          portable watchdog + pg kill, no coreutils needed)
   -h, --help             show help
@@ -63,10 +63,10 @@ midflight [OPTIONS] [QUESTION...]
 midflight "should we use SSE or WebSockets for real-time updates?"
 
 # Override the provider for a single call
-midflight -p gemini "is this regex vulnerable to ReDoS?"
+midflight -p agy "is this regex vulnerable to ReDoS?"
 
 # Override both provider and model
-midflight -p gemini --model gemini-2.5-flash "quick take on this approach"
+midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
 
 # Include context + source files
 midflight --context recent-debug.md --include "src/**/*.ts" \
@@ -108,10 +108,11 @@ Your `~/.config/mid-flight/config` is never modified.
 `--model` maps to the appropriate config key based on the active provider:
 - `-p codex --model gpt-5` → sets `codex_model`
 - `-p gemini --model gemini-2.5-flash` → sets `gemini_model`
+- `-p agy --model gemini-3.1-pro-high` → sets `agy_model`
 - `--model gemini-2.5-flash` (no `-p`) → sets the model for whatever provider is
   active in your config
-- `--video clip.mp4 --model gemini-2.5-flash` → sets `gemini_model`; video mode
-  always runs on Gemini, so the override follows it there
+- `--video clip.mp4 --model gemini-2.5-flash` → sets `agy_model` and
+  `gemini_model`; video picks agy if present, else Gemini
 
 ## Exit codes
 

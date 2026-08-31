@@ -4,6 +4,8 @@ provider="codex"
 codex_model="gpt-5.4"
 codex_reasoning_effort="high"
 gemini_model="gemini-2.5-pro"
+agy_model=""
+agy_effort=""
 opencode_model=""
 opencode_variant="high"
 opencode_format="default"
@@ -11,6 +13,8 @@ oz_model="auto"
 oz_output_format="text"
 oz_profile=""
 CONFIG_VALIDATION_ISSUES=()
+AGY_INSTALL_URL="https://antigravity.google/docs/cli/install"
+GEMINI_INSTALL_URL="https://github.com/google-gemini/gemini-cli"
 
 config_file_path() {
   printf '%s\n' "${HOME}/.config/mid-flight/config"
@@ -38,7 +42,7 @@ format_config_validation_issues() {
 
 supported_config_key() {
   case "$1" in
-    provider|codex_model|codex_reasoning_effort|gemini_model|opencode_model|opencode_variant|opencode_format|oz_model|oz_output_format|oz_profile)
+    provider|codex_model|codex_reasoning_effort|gemini_model|agy_model|agy_effort|opencode_model|opencode_variant|opencode_format|oz_model|oz_output_format|oz_profile)
       return 0
       ;;
     *)
@@ -73,6 +77,12 @@ load_config() {
     value="$(config_value gemini_model "$config_file")"
     [ -n "$value" ] && gemini_model="$value"
 
+    value="$(config_value agy_model "$config_file")"
+    [ -n "$value" ] && agy_model="$value"
+
+    value="$(config_value agy_effort "$config_file")"
+    [ -n "$value" ] && agy_effort="$value"
+
     value="$(config_value opencode_model "$config_file")"
     [ -n "$value" ] && opencode_model="$value"
 
@@ -94,6 +104,14 @@ load_config() {
     log "config loaded: provider=$provider"
   else
     log "no config file found at $config_file, using defaults"
+  fi
+
+  normalize_provider
+}
+
+normalize_provider() {
+  if [ "$provider" = "antigravity" ]; then
+    provider="agy"
   fi
 }
 
@@ -129,9 +147,9 @@ validate_config_file_syntax() {
 
 validate_loaded_config() {
   case "$provider" in
-    codex|gemini|opencode|oz) ;;
+    codex|gemini|agy|opencode|oz) ;;
     *)
-      add_config_validation_issue "Unsupported provider '$provider'. Supported providers: codex, gemini, opencode, oz."
+      add_config_validation_issue "Unsupported provider '$provider'. Supported providers: codex, gemini, agy, opencode, oz."
       ;;
   esac
 
@@ -149,6 +167,13 @@ validate_loaded_config() {
   if [ -z "$gemini_model" ]; then
     add_config_validation_issue "gemini_model cannot be empty."
   fi
+
+  case "$agy_effort" in
+    ""|low|medium|high) ;;
+    *)
+      add_config_validation_issue "Unsupported agy_effort '$agy_effort'. Use low, medium, high, or leave blank."
+      ;;
+  esac
 
   case "$opencode_format" in
     default|json) ;;
@@ -187,10 +212,23 @@ validate_config_state() {
 resolve_provider_for_mode() {
   local mode="$1"
 
-  if [ "$mode" = "video" ]; then
-    if [ "$provider" != "gemini" ]; then
-      log "video mode: overriding provider=$provider -> gemini (video requires multimodal)"
-    fi
+  if [ "$mode" != "video" ]; then
+    return
+  fi
+
+  normalize_provider
+
+  case "$provider" in
+    gemini|agy)
+      return
+      ;;
+  esac
+
+  if command -v agy >/dev/null 2>&1; then
+    log "video mode: overriding provider=$provider -> agy (video requires multimodal)"
+    provider="agy"
+  else
+    log "video mode: overriding provider=$provider -> gemini (video requires multimodal)"
     provider="gemini"
   fi
 }
@@ -198,6 +236,7 @@ resolve_provider_for_mode() {
 ensure_provider_available() {
   local provider_name="$1"
   local install_url=""
+  local extra=""
 
   if command -v "$provider_name" >/dev/null 2>&1; then
     return
@@ -205,12 +244,16 @@ ensure_provider_available() {
 
   case "$provider_name" in
     codex) install_url="https://github.com/openai/codex" ;;
-    gemini) install_url="https://github.com/google-gemini/gemini-cli" ;;
+    gemini)
+      install_url="$GEMINI_INSTALL_URL"
+      extra=" Consumer Gemini CLI access ended 18 Jun 2026; prefer Antigravity CLI (agy): $AGY_INSTALL_URL"
+      ;;
+    agy) install_url="$AGY_INSTALL_URL" ;;
     opencode) install_url="https://opencode.ai/docs/cli/" ;;
     oz) install_url="https://docs.warp.dev/reference/cli/cli" ;;
   esac
 
   error_exit \
     "'$provider_name' not found in PATH" \
-    "Error: '$provider_name' CLI not found. Install it: $install_url"
+    "Error: '$provider_name' CLI not found. Install it: ${install_url}${extra}"
 }

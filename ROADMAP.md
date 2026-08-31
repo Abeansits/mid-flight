@@ -4,19 +4,18 @@ Follow-up from the 2026-08-28 review. Highest leverage first. Do not collect CLI
 
 ## Now
 
-### 1. Antigravity (`agy`) as the Google provider
+### 1. Antigravity (`agy`) as the Google provider — in `feat/agy-provider`
 
-Consumer Gemini CLI stopped serving requests on 18 Jun 2026 (free / AI Pro / AI Ultra). Enterprise Code Assist and paid Gemini API keys still work.
+Shipped on that branch (not yet on `main`):
 
-- Canonical config: `provider=agy` (alias `antigravity` → binary `agy`)
-- Keep `provider=gemini` calling the `gemini` binary for enterprise / API-key users
-- Headless shape: `agy -p "..." --output-format text` plus optional `--model`, `--effort`
-- Implement mode needs `--dangerously-skip-permissions` (headless otherwise soft-denies writes)
-- Consult should **not** skip permissions
-- Video is the risky bit: Gemini uses `@path` + `--include-directories`. Agy uses `--add-dir` and does not document the `@path` inline syntax. Prefer `agy` for video when it is on `PATH`, else `gemini`. Probe real `agy` against a small local mp4 before claiming video.
-- Default `agy_model` should be empty (agy slugs rotate). Do not pin a rotting Gemini 2.5 default onto agy.
+- `provider=agy` (alias `antigravity` → binary `agy`)
+- `provider=gemini` still calls `gemini` for enterprise / API-key users
+- `agy -p --output-format text` plus optional `--model` / `--effort`
+- Implement passes `--dangerously-skip-permissions`; consult/video do not
+- Video prefers agy when on `PATH`, else Gemini; pinned `provider=gemini` stays on Gemini
+- `agy_model` / `agy_effort` default empty so slugs don't rot
 
-Install: https://antigravity.google/docs/cli/install (`curl -fsSL https://antigravity.google/cli/install.sh | bash`). Docs: https://antigravity.google/docs/cli/headless/
+Still to verify before calling video "done": a live `agy` run against a small local mp4. Stub tests cover `--add-dir` and no `@path`, not real multimodal.
 
 ## Next
 

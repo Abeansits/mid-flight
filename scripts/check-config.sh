@@ -64,8 +64,12 @@ main() {
     status=1
   fi
 
-  if ! report_provider_status "gemini" "Gemini (required for video mode)" "recommended"; then
-    status=1
+  if command -v agy >/dev/null 2>&1 || command -v gemini >/dev/null 2>&1; then
+    report_provider_status "agy" "Antigravity (agy, video + Google consults)" "optional" || true
+    report_provider_status "gemini" "Gemini (video fallback / enterprise)" "optional" || true
+  else
+    printf '[warn] Video/Google: neither agy nor gemini found in PATH. Consumer Gemini CLI access ended 18 Jun 2026; install agy: %s\n' \
+      "https://antigravity.google/docs/cli/install"
   fi
 
   report_provider_status "codex" "Codex (optional alternate provider)" "optional" || true
