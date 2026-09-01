@@ -81,6 +81,23 @@ printf '%s' "$model" > "$TEST_DIR/oz_model.txt"
 printf 'probe-ok\n'
 EOF
       ;;
+    agy)
+      cat > "$TEST_DIR/bin/agy" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+model=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model) model="$2"; shift 2 ;;
+    -p|--print|--prompt|--effort|--add-dir|--output-format) shift 2 ;;
+    --dangerously-skip-permissions) shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "$model" > "$TEST_DIR/agy_model.txt"
+printf 'probe-ok\n'
+EOF
+      ;;
     *)
       echo "FAIL: no model probe for provider '$provider'" >&2
       exit 1
@@ -135,29 +152,38 @@ run_cli -p oz --model auto-genius "test question" >/dev/null
 assert_eq "auto-genius" "$(cat "$TEST_DIR/oz_model.txt")" \
   "--model with -p oz should set oz_model"
 
-echo "Test 5: --model in video mode maps to gemini_model"
+echo "Test 5: --model in video mode maps to the Google provider model keys"
 
-# Video mode always runs on gemini regardless of the configured provider, so
-# --model has to resolve against gemini rather than the config's provider.
+# Video without -p picks agy-if-present else gemini, so --model must land
+# on both google keys rather than the configured provider (codex).
 write_config <<'EOF'
 provider=codex
 codex_model=gpt-5.4
 gemini_model=gemini-2.5-pro
 EOF
 
-rm -f "$TEST_DIR/gemini_model.txt" "$TEST_DIR/codex_model.txt"
+rm -f "$TEST_DIR/gemini_model.txt" "$TEST_DIR/codex_model.txt" "$TEST_DIR/agy_model.txt"
 write_model_probe gemini
 printf 'fake-video-bytes\n' > "$TEST_DIR/clip.mp4"
 
 run_cli --video "$TEST_DIR/clip.mp4" --model gemini-2.5-flash "describe this" >/dev/null
 
 assert_eq "gemini-2.5-flash" "$(cat "$TEST_DIR/gemini_model.txt")" \
-  "--model in video mode should set gemini_model"
+  "--model in video mode should set gemini_model when agy is absent"
 
 if [ -f "$TEST_DIR/codex_model.txt" ]; then
   echo "FAIL: video mode must not route --model to codex_model" >&2
   exit 1
 fi
+
+echo "Test 5b: -p agy --model sets agy_model"
+
+write_model_probe agy
+
+run_cli -p agy --model gemini-3.1-pro-high "test question" >/dev/null
+
+assert_eq "gemini-3.1-pro-high" "$(cat "$TEST_DIR/agy_model.txt")" \
+  "--model with -p agy should set agy_model"
 
 echo "Test 6: --model against an unsupported provider is rejected"
 

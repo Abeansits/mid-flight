@@ -21,7 +21,7 @@ Run MidFlight's config validation script and summarize the result for the user.
 2. If the script passes:
    - Confirm that MidFlight's config looks healthy
    - Mention the active provider
-   - Call out any non-blocking warnings, such as Gemini missing for video mode
+   - Call out any non-blocking warnings, such as neither `agy` nor Gemini being available for video mode
 
 3. If the script fails:
    - List the blocking issues clearly

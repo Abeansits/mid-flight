@@ -3,7 +3,7 @@
 #
 # Reads a query file (context + question), wraps it with a system prompt
 # optimized for mid-development consultation, and routes to the configured
-# provider (Codex, Gemini, OpenCode, or Oz). Response goes to stdout.
+# provider (Codex, Gemini, Antigravity, OpenCode, or Oz). Response goes to stdout.
 #
 # Usage: query.sh <query-file-path> [consult|implement]
 #        query.sh <video-file-or-url> video [prompt]

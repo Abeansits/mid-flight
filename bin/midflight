@@ -42,7 +42,7 @@ version() {
 
 usage() {
   cat <<'EOF'
-midflight — consult Codex, Gemini, OpenCode, or Oz from any terminal.
+midflight — consult Codex, Gemini, Antigravity, OpenCode, or Oz from any terminal.
 
 Usage:
   midflight [OPTIONS] [QUESTION...]
@@ -51,13 +51,13 @@ Usage:
 
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | opencode | oz (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz (overrides config)
       --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
-      --video FILE|URL    analyze a video (forces video mode + Gemini)
+      --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
       --timeout SECONDS   hard bound on the provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
                           so provider children die too; no coreutils needed)
@@ -66,8 +66,8 @@ Options:
 
 Examples:
   midflight "should we use SSE or WebSockets here?"
-  midflight -p gemini "is this regex safe against ReDoS?"
-  midflight -p gemini --model gemini-2.5-flash "quick take on this approach"
+  midflight -p agy "is this regex safe against ReDoS?"
+  midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
   midflight --context notes.md -i "src/*.ts" "where is the leak?"
   midflight -m implement -f request.md
   midflight --video ./ad.mp4 "does this match the storyboard?"
@@ -172,27 +172,43 @@ build_config_home() {
 
   if [ -n "$MODEL" ]; then
     local effective_provider="$PROVIDER"
-    # Video mode always runs on gemini, so the override must land on
-    # gemini_model no matter what the config or -p says.
+    local write_google_models="false"
+
     if [ "$MODE" = "video" ]; then
-      effective_provider="gemini"
+      case "$effective_provider" in
+        gemini|agy|antigravity) ;;
+        *)
+          # Engine picks agy-if-present else gemini. Stamp both keys.
+          write_google_models="true"
+          ;;
+      esac
     elif [ -z "$effective_provider" ]; then
       effective_provider="$(grep '^provider=' "$config" | cut -d= -f2 | tr -d '[:space:]')"
     fi
-    [ -z "$effective_provider" ] && effective_provider="codex"
+    [ -z "$effective_provider" ] && [ "$write_google_models" != "true" ] && effective_provider="codex"
 
-    local model_key=""
-    case "$effective_provider" in
-      codex)    model_key="codex_model" ;;
-      gemini)   model_key="gemini_model" ;;
-      opencode) model_key="opencode_model" ;;
-      oz)       model_key="oz_model" ;;
-      *)        die "unknown provider '$effective_provider' for --model mapping" ;;
-    esac
+    write_model_key() {
+      local key="$1"
+      grep -v "^${key}=" "$config" > "$config.tmp" 2>/dev/null || true
+      printf '%s=%s\n' "$key" "$MODEL" >> "$config.tmp"
+      mv "$config.tmp" "$config"
+    }
 
-    grep -v "^${model_key}=" "$config" > "$config.tmp" 2>/dev/null || true
-    printf '%s=%s\n' "$model_key" "$MODEL" >> "$config.tmp"
-    mv "$config.tmp" "$config"
+    if [ "$write_google_models" = "true" ]; then
+      write_model_key "gemini_model"
+      write_model_key "agy_model"
+    else
+      local model_key=""
+      case "$effective_provider" in
+        codex)             model_key="codex_model" ;;
+        gemini)            model_key="gemini_model" ;;
+        agy|antigravity)   model_key="agy_model" ;;
+        opencode)          model_key="opencode_model" ;;
+        oz)                model_key="oz_model" ;;
+        *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
+      esac
+      write_model_key "$model_key"
+    fi
   fi
 
   CONFIG_HOME="$home_dir"

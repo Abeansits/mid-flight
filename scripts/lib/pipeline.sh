@@ -116,8 +116,12 @@ build_full_prompt() {
   if [ "$MODE" = "video" ]; then
     if [ "$VIDEO_IS_URL" = "true" ]; then
       video_ref="$VIDEO_SOURCE"
-    else
+    elif [ "$provider" = "gemini" ]; then
       video_ref="@${VIDEO_SOURCE}"
+    else
+      # Antigravity has no Gemini-style @path inline syntax; --add-dir
+      # exposes the staged file and the prompt names it by path.
+      video_ref="$VIDEO_SOURCE"
     fi
 
     FULL_PROMPT="${PROMPT_CONTENT}
@@ -128,7 +132,7 @@ ${VIDEO_PROMPT}
 
 ${video_ref}"
     printf '%s' "$FULL_PROMPT" > "$RUN_DIR/full_prompt.txt"
-    log "sending video query to gemini (source: ${VIDEO_SOURCE##*/}, prompt: ${#VIDEO_PROMPT} chars)..."
+    log "sending video query to $provider (source: ${VIDEO_SOURCE##*/}, prompt: ${#VIDEO_PROMPT} chars)..."
     return
   fi
 

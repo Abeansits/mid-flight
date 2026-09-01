@@ -4,14 +4,14 @@
     "name": "Abeansits"
   },
   "metadata": {
-    "description": "On-demand consultation with Codex, Gemini, OpenCode, or Oz at any point during development",
-    "version": "1.7.0"
+    "description": "On-demand consultation with Codex, Gemini, Antigravity, OpenCode, or Oz at any point during development",
+    "version": "1.8.0"
   },
   "plugins": [{
     "name": "mid-flight",
     "source": "./",
-    "description": "Consult Codex, Gemini, OpenCode, or Oz mid-development via /midflight. Get a second opinion when stuck, validate approaches, or sanity-check decisions without leaving your session.",
+    "description": "Consult Codex, Gemini, Antigravity, OpenCode, or Oz mid-development via /midflight. Get a second opinion when stuck, validate approaches, or sanity-check decisions without leaving your session.",
     "category": "code-quality",
-    "tags": ["consultation", "codex", "gemini", "opencode", "oz", "skills", "second-opinion"]
+    "tags": ["consultation", "codex", "gemini", "antigravity", "agy", "opencode", "oz", "skills", "second-opinion"]
   }]
 }
