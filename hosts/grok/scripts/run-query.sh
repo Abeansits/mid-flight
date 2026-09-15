@@ -3,14 +3,15 @@
 #
 # There is no provider=grok yet, so host=Grok + provider=grok circularity does
 # not apply. The default provider (often codex) is a fine external consult from
-# Grok Build. Optional --provider NAME forces a provider when using the CLI.
+# Grok Build. Optional --provider NAME forces a provider when using the CLI or
+# when falling back to query.sh (via a temporary HOME config staging).
 #
 # Usage (mirrors scripts/query.sh / bin/midflight handoff from the skill):
 #   run-query.sh <query-file> [consult|implement]
 #   run-query.sh <video-file-or-url> video [prompt]
 #
 # Extra flags (must come before positional args):
-#   --provider NAME         force provider (CLI path only)
+#   --provider NAME         force provider
 #   --start-dir DIR         start engine walk from DIR (tests / skill scripts)
 
 set -euo pipefail
@@ -46,10 +47,10 @@ fi
 
 resolve_args=()
 [ -n "$START_DIR" ] && resolve_args+=(--start-dir "$START_DIR")
-# shellcheck disable=SC2207
-resolved=( $(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}") )
-kind="${resolved[0]}"
-engine="${resolved[1]}"
+# Preserve paths that contain spaces (kind is a single token; path is the rest).
+resolved_line="$(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}")"
+kind="${resolved_line%% *}"
+engine="${resolved_line#* }"
 
 case "$kind" in
   cli)
@@ -75,22 +76,24 @@ case "$kind" in
     exec bash "$engine" "${cli_args[@]}"
     ;;
   query)
-    if [ -n "$FORCE_PROVIDER" ]; then
-      # query.sh reads provider from config; stage a temp config override via HOME.
-      tmp_home="$(mktemp -d "${TMPDIR:-/tmp}/midflight-grok-home.XXXXXX")"
-      cleanup() { rm -rf "$tmp_home"; }
-      trap cleanup EXIT
-      mkdir -p "$tmp_home/.config/mid-flight"
-      config_src="${HOME}/.config/mid-flight/config"
-      if [ -f "$config_src" ]; then
-        grep -v '^provider=' "$config_src" > "$tmp_home/.config/mid-flight/config" || true
-      else
-        : > "$tmp_home/.config/mid-flight/config"
-      fi
-      printf 'provider=%s\n' "$FORCE_PROVIDER" >> "$tmp_home/.config/mid-flight/config"
-      HOME="$tmp_home" exec bash "$engine" "$@"
+    # query.sh reads provider from config; stage a temp config override via HOME
+    # when --provider was given. Prefer the CLI path whenever possible; this
+    # branch is a fallback. Run as a child (not exec) so EXIT can remove tmp.
+    if [ -z "$FORCE_PROVIDER" ]; then
+      exec bash "$engine" "$@"
     fi
-    exec bash "$engine" "$@"
+    tmp_home="$(mktemp -d "${TMPDIR:-/tmp}/midflight-grok-home.XXXXXX")"
+    # shellcheck disable=SC2064
+    trap 'rm -rf -- "$tmp_home"' EXIT
+    mkdir -p "$tmp_home/.config/mid-flight"
+    config_src="${HOME}/.config/mid-flight/config"
+    if [ -f "$config_src" ]; then
+      grep -v '^provider=' "$config_src" > "$tmp_home/.config/mid-flight/config" || true
+    else
+      : > "$tmp_home/.config/mid-flight/config"
+    fi
+    printf 'provider=%s\n' "$FORCE_PROVIDER" >> "$tmp_home/.config/mid-flight/config"
+    HOME="$tmp_home" bash "$engine" "$@"
     ;;
   *)
     printf 'run-query: unexpected engine kind %s\n' "$kind" >&2
