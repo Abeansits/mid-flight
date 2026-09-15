@@ -45,10 +45,10 @@ fi
 
 resolve_args=()
 [ -n "$START_DIR" ] && resolve_args+=(--start-dir "$START_DIR")
-# shellcheck disable=SC2207
-resolved=( $(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}") )
-kind="${resolved[0]}"
-engine="${resolved[1]}"
+# Preserve paths that contain spaces (kind is a single token; path is the rest).
+resolved_line="$(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}")"
+kind="${resolved_line%% *}"
+engine="${resolved_line#* }"
 
 if [ "$ALLOW_CODEX" = true ]; then
   export MIDFLIGHT_ALLOW_CODEX_PROVIDER=1
@@ -87,6 +87,7 @@ case "$kind" in
   query)
     # query.sh reads provider from config; stage a temp config override via HOME.
     # Prefer the CLI path whenever possible; this branch is a fallback.
+    # Run as a child (not exec) so the EXIT trap can remove tmp_home.
     tmp_home="$(mktemp -d "${TMPDIR:-/tmp}/midflight-codex-home.XXXXXX")"
     cleanup() { rm -rf "$tmp_home"; }
     trap cleanup EXIT
@@ -98,7 +99,7 @@ case "$kind" in
       : > "$tmp_home/.config/mid-flight/config"
     fi
     printf 'provider=%s\n' "$provider" >> "$tmp_home/.config/mid-flight/config"
-    HOME="$tmp_home" exec bash "$engine" "$@"
+    HOME="$tmp_home" bash "$engine" "$@"
     ;;
   *)
     printf 'run-query: unexpected engine kind %s\n' "$kind" >&2
