@@ -3,7 +3,10 @@ set -euo pipefail
 
 SKILL_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SKILL_SCRIPTS/.." && pwd)"
-HOST_SCRIPTS="$(cd "$SKILL_DIR/../../scripts" 2>/dev/null && pwd || true)"
+HOST_SCRIPTS=""
+if [ -d "$SKILL_DIR/../../scripts" ]; then
+  HOST_SCRIPTS="$(cd "$SKILL_DIR/../../scripts" && pwd)"
+fi
 
 if [ -n "$HOST_SCRIPTS" ] && [ -f "$HOST_SCRIPTS/run-check-config.sh" ]; then
   exec bash "$HOST_SCRIPTS/run-check-config.sh" --start-dir "$SKILL_DIR" "$@"

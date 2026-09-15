@@ -5,7 +5,10 @@ set -euo pipefail
 
 SKILL_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SKILL_SCRIPTS/.." && pwd)"
-HOST_SCRIPTS="$(cd "$SKILL_DIR/../../scripts" 2>/dev/null && pwd || true)"
+HOST_SCRIPTS=""
+if [ -d "$SKILL_DIR/../../scripts" ]; then
+  HOST_SCRIPTS="$(cd "$SKILL_DIR/../../scripts" && pwd)"
+fi
 
 if [ -n "$HOST_SCRIPTS" ] && [ -f "$HOST_SCRIPTS/run-query.sh" ]; then
   exec bash "$HOST_SCRIPTS/run-query.sh" --start-dir "$SKILL_DIR" "$@"
@@ -24,7 +27,6 @@ if [ -n "${MIDFLIGHT_ROOT:-}" ] && [ -f "$MIDFLIGHT_ROOT/hosts/codex/scripts/pre
   GUARD="$MIDFLIGHT_ROOT/hosts/codex/scripts/prefer-non-codex-provider.sh"
 fi
 
-ALLOW_ARGS=()
 PROVIDER_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in

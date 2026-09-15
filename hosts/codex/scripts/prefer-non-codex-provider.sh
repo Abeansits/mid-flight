@@ -7,7 +7,7 @@
 # explicitly opts in.
 #
 # Usage:
-#   prefer-non-codex-provider.sh [--print-only]
+#   prefer-non-codex-provider.sh
 #     Reads ~/.config/mid-flight/config (or MIDFLIGHT_CONFIG), prints the
 #     provider MidFlight should use, and may warn on stderr.
 #
@@ -21,11 +21,6 @@
 #   MIDFLIGHT_ALLOW_CODEX_PROVIDER=1 before invoking this script)
 
 set -euo pipefail
-
-print_only=false
-if [ "${1:-}" = "--print-only" ]; then
-  print_only=true
-fi
 
 config_file="${MIDFLIGHT_CONFIG:-${HOME}/.config/mid-flight/config}"
 provider="codex"
