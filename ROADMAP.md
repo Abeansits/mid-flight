@@ -15,20 +15,23 @@ Follow-up from the 2026-08-28 review. Highest leverage first. Do not collect CLI
 
 Still nice to have: a live `agy` run against a small local mp4. Stub tests cover `--add-dir` and no `@path`, not real multimodal.
 
-### 2a. Codex host adapter — in this PR (v1.9.0)
+### 2a. Codex host adapter — stacked base (v1.9.0, PR #14)
 
 Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
 
+### 2b. Grok Build host adapter — in this PR
+
+Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex. **No** circular guard: `provider=grok` does not exist yet, so default `provider=codex` (or another configured CLI) is the intended external consult from Grok. Install via copy/symlink into `~/.grok/skills/`, project `.grok/skills/`, or `~/.agents/skills/`.
+
 ## Next
 
-### 2b. Remaining host adapters
+### 2c. Remaining host adapters
 
 The product is “don’t leave the agent you’re in.” The engine is already host-agnostic.
 
 Still to ship:
 
 - Cursor
-- Grok Build
 
 Standalone CLI Path (a) shipped in PR #7. Path (b) did not: the CLI does not auto-summarize working context.
 
