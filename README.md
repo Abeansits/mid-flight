@@ -42,7 +42,7 @@ You don't pick the mode. MidFlight infers it from the question. Uncertain → co
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
-## Install — four doors, same engine
+## Install — five doors, same engine
 
 You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 
@@ -169,6 +169,54 @@ Restart Grok Build (or open the extensions modal with `/skills`), then:
 
 There is **no** `provider=grok` yet, so circular `host=Grok` + `provider=grok` does not apply. The default provider is often `codex`, which is a fine external consult from Grok Build.
 
+
+### 5. Cursor skills
+
+Same engine, for [Cursor](https://cursor.com/docs/skills) (`/midflight` Agent Skills).
+
+**Engine first** (the skills call it):
+
+```bash
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
+ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+```
+
+**Then install the skills** (copy or symlink — recommended):
+
+```bash
+# User-wide (~/.cursor/skills; can Sync Skills for Cloud Agents)
+mkdir -p ~/.cursor/skills
+cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight
+cp -R hosts/cursor/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
+# or symlink:
+# ln -s "$(pwd)/hosts/cursor/skills/midflight" ~/.cursor/skills/midflight
+
+# Project-local
+mkdir -p .cursor/skills
+ln -s "$(pwd)/hosts/cursor/skills/midflight" .cursor/skills/midflight
+ln -s "$(pwd)/hosts/cursor/skills/midflight-check-config" .cursor/skills/midflight-check-config
+
+# Also discovered: ~/.agents/skills/, .agents/skills/
+# (plus Claude/Codex compat dirs). Prefer ~/.cursor/skills/ for reliable /slash invoke.
+```
+
+Optional via the [skills](https://github.com/vercel-labs/skills) CLI — **path-scope** so you do not pick up Codex/Grok copies of the same skill name:
+
+```bash
+npx skills add Abeansits/mid-flight/hosts/cursor/skills --agent cursor -g
+```
+
+Restart Cursor (or open a new Agent chat), then:
+
+```text
+/midflight should we use WebSockets or SSE for real-time updates?
+/midflight                          # Cursor picks the question from the session
+/midflight-check-config             # validate provider setup
+```
+
+There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cursor` does not apply. The default provider is often `codex`, which is a fine external consult from Cursor.
+
 ## Providers
 
 | Provider | Consult | Implement | Video | Model | Extra |
@@ -234,7 +282,7 @@ No transcript parsing. No hooks. The current session already has the context; Mi
 
 ## Troubleshooting
 
-Validate setup first: `/midflight-check-config` (Claude / Grok Build), `$midflight-check-config` (Codex), or `bash scripts/check-config.sh` (CLI).
+Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), `$midflight-check-config` (Codex), or `bash scripts/check-config.sh` (CLI).
 
 | Error | Cause | Fix |
 |---|---|---|
@@ -289,7 +337,7 @@ Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.
 
 MidFlight is a thin router over other agents' CLIs.
 
-- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
+- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), Cursor (`/midflight` skills under `hosts/cursor/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
 - **Provider** — `codex`, `agy`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
