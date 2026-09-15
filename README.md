@@ -42,7 +42,7 @@ You don't pick the mode. MidFlight infers it from the question. Uncertain → co
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
-## Install — three doors, same engine
+## Install — four doors, same engine
 
 You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 
@@ -128,6 +128,47 @@ $midflight-check-config             # validate provider setup
 
 Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
 
+### 4. Grok Build skills
+
+Same engine, for [Grok Build](https://docs.x.ai/build/features/skills-plugins-marketplaces) (`/midflight` slash skills).
+
+**Engine first** (the skills call it):
+
+```bash
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
+ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+```
+
+**Then install the skills** (copy or symlink — prefer this over marketplace publish):
+
+```bash
+# User-wide (~/.grok/skills)
+mkdir -p ~/.grok/skills
+cp -R hosts/grok/skills/midflight ~/.grok/skills/midflight
+cp -R hosts/grok/skills/midflight-check-config ~/.grok/skills/midflight-check-config
+# or symlink:
+# ln -s "$(pwd)/hosts/grok/skills/midflight" ~/.grok/skills/midflight
+
+# Project-local (./.grok/skills, walked up to repo root)
+mkdir -p .grok/skills
+ln -s "$(pwd)/hosts/grok/skills/midflight" .grok/skills/midflight
+ln -s "$(pwd)/hosts/grok/skills/midflight-check-config" .grok/skills/midflight-check-config
+
+# Also discovered via Agents.md compatibility:
+#   ~/.agents/skills/
+```
+
+Restart Grok Build (or open the extensions modal with `/skills`), then:
+
+```text
+/midflight should we use WebSockets or SSE for real-time updates?
+/midflight                          # Grok picks the question from the session
+/midflight-check-config             # validate provider setup
+```
+
+There is **no** `provider=grok` yet, so circular `host=Grok` + `provider=grok` does not apply. The default provider is often `codex`, which is a fine external consult from Grok Build.
+
 ## Providers
 
 | Provider | Consult | Implement | Video | Model | Extra |
@@ -193,7 +234,7 @@ No transcript parsing. No hooks. The current session already has the context; Mi
 
 ## Troubleshooting
 
-Validate setup first: `/midflight-check-config` (Claude), `$midflight-check-config` (Codex), or `bash scripts/check-config.sh` (CLI).
+Validate setup first: `/midflight-check-config` (Claude / Grok Build), `$midflight-check-config` (Codex), or `bash scripts/check-config.sh` (CLI).
 
 | Error | Cause | Fix |
 |---|---|---|
@@ -248,7 +289,7 @@ Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.
 
 MidFlight is a thin router over other agents' CLIs.
 
-- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
+- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
 - **Provider** — `codex`, `agy`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
