@@ -2,11 +2,9 @@
 
 Follow-up from the 2026-08-28 review. Highest leverage first. Do not collect CLIs for their own sake — each provider is a flag contract that will break (Codex `--full-auto` already did). OpenCode already multiplexes many *models*; add a CLI only when you want that **harness**.
 
-## Now
+## Done recently
 
-### 1. Antigravity (`agy`) as the Google provider — in `feat/agy-provider`
-
-Shipped on that branch (not yet on `main`):
+### 1. Antigravity (`agy`) as the Google provider — shipped on `main` (v1.8.0)
 
 - `provider=agy` (alias `antigravity` → binary `agy`)
 - `provider=gemini` still calls `gemini` for enterprise / API-key users
@@ -15,25 +13,28 @@ Shipped on that branch (not yet on `main`):
 - Video prefers agy when on `PATH`, else Gemini; pinned `provider=gemini` stays on Gemini
 - `agy_model` / `agy_effort` default empty so slugs don't rot
 
-Still to verify before calling video "done": a live `agy` run against a small local mp4. Stub tests cover `--add-dir` and no `@path`, not real multimodal.
+Still nice to have: a live `agy` run against a small local mp4. Stub tests cover `--add-dir` and no `@path`, not real multimodal.
+
+### 2a. Codex host adapter — in this PR (v1.9.0)
+
+Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
 
 ## Next
 
-### 2. Host adapters (more important than more providers)
+### 2b. Remaining host adapters
 
-The product is “don’t leave the agent you’re in.” The engine is already host-agnostic. `/midflight` only exists as a Claude Code command.
+The product is “don’t leave the agent you’re in.” The engine is already host-agnostic.
 
-Ship the same skill/plugin for:
+Still to ship:
 
-- Grok Build
 - Cursor
-- Codex
+- Grok Build
 
 Standalone CLI Path (a) shipped in PR #7. Path (b) did not: the CLI does not auto-summarize working context.
 
 ### 3. `grok -p` as a first-class provider
 
-Complementary *harness*, not “another Grok model” (OpenCode can already route to Grok-the-model). Do this after agy.
+Complementary *harness*, not “another Grok model” (OpenCode can already route to Grok-the-model). Do this after host adapters.
 
 Waitlist only: Cursor `agent -p --mode=ask`, GitHub Copilot `copilot -p`. Skip Aider / Amp / Crush unless someone asks.
 

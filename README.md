@@ -42,7 +42,7 @@ You don't pick the mode. MidFlight infers it from the question. Uncertain → co
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
-## Install — two doors, same engine
+## Install — three doors, same engine
 
 You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 
@@ -87,6 +87,46 @@ midflight --video ./ad-v3.mp4 "does this match the storyboard?"
 ```
 
 Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).
+
+
+### 3. Codex skills
+
+Same engine, for [Codex](https://developers.openai.com/codex/skills) (`$midflight` instead of `/midflight`).
+
+**Engine first** (the skills call it):
+
+```bash
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
+ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+```
+
+**Then install the skills** (pick one):
+
+```bash
+# User-wide via gh skill (Codex agent)
+gh skill install Abeansits/mid-flight midflight --agent codex --scope user
+gh skill install Abeansits/mid-flight midflight-check-config --agent codex --scope user
+
+# Or via Codex $skill-installer from this repo:
+#   hosts/codex/skills/midflight
+#   hosts/codex/skills/midflight-check-config
+
+# Or symlink from a checkout into ~/.agents/skills
+mkdir -p ~/.agents/skills
+ln -s "$(pwd)/hosts/codex/skills/midflight" ~/.agents/skills/midflight
+ln -s "$(pwd)/hosts/codex/skills/midflight-check-config" ~/.agents/skills/midflight-check-config
+```
+
+Restart Codex (or let it pick up skills), then:
+
+```text
+$midflight should we use WebSockets or SSE for real-time updates?
+$midflight                          # Codex picks the question from the session
+$midflight-check-config             # validate provider setup
+```
+
+Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
 
 ## Providers
 
@@ -153,7 +193,7 @@ No transcript parsing. No hooks. The current session already has the context; Mi
 
 ## Troubleshooting
 
-Validate setup first: `/midflight-check-config` (plugin) or `bash scripts/check-config.sh` (CLI).
+Validate setup first: `/midflight-check-config` (Claude), `$midflight-check-config` (Codex), or `bash scripts/check-config.sh` (CLI).
 
 | Error | Cause | Fix |
 |---|---|---|
@@ -208,7 +248,7 @@ Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.
 
 MidFlight is a thin router over other agents' CLIs.
 
-- **Host** — Claude Code (`/midflight`) or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
+- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
 - **Provider** — `codex`, `agy`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
