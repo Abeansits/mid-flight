@@ -4,7 +4,8 @@
 # Preferred one-liner (HTTPS only; curl -f fails on HTTP errors):
 #   curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
 #
-# Pin a release tag (uses that tag's install.sh + matching source tarball):
+# Default REF is main (repo tip). Published GitHub releases may lag plugin
+# metadata on main — pin only when you want a specific tagged tree:
 #   curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/v1.14.0/scripts/install.sh | bash -s -- --ref v1.14.0
 #
 # From a local checkout (no network):
@@ -13,7 +14,7 @@
 # Environment (also accepted as flags where noted):
 #   PREFIX     install prefix (default: /usr/local if writable, else ~/.local)
 #   DESTDIR    staging root for packaging (prepended to PREFIX)
-#   REF        git ref: main, vX.Y.Z, or X.Y.Z (default: latest GitHub release tag, else main)
+#   REF        git ref: main, vX.Y.Z, or X.Y.Z (default: main)
 #   DRY_RUN=1  print actions only
 
 set -euo pipefail
@@ -46,7 +47,7 @@ Options:
                      /usr/local, else ~/.local. Env: PREFIX.
   --destdir DIR      Packaging staging root (prepended to prefix). Env: DESTDIR.
   --ref REF          Source ref: main | vX.Y.Z | X.Y.Z. Env: REF / MIDFLIGHT_REF.
-                     Default: latest GitHub release tag, else main.
+                     Default: main (repo tip). Use --ref vX.Y.Z to pin a release.
   --from-dir DIR     Copy from a local checkout (skips network download).
   --dry-run          Print planned actions; do not write files. Env: DRY_RUN=1.
   -h, --help         Show this help.
@@ -110,7 +111,8 @@ default_prefix() {
   fi
   if [ -w /usr/local/bin ] 2>/dev/null || [ -w /usr/local ] 2>/dev/null; then
     printf '/usr/local\n'
-  elif mkdir -p "${HOME}/.local/bin" 2>/dev/null; then
+  elif [ -n "${HOME:-}" ]; then
+    # Do not mkdir here — dry-run must not touch the real filesystem.
     printf '%s/.local\n' "$HOME"
   else
     die "cannot determine PREFIX; pass --prefix DIR"
@@ -121,25 +123,6 @@ read_version_from_plugin() {
   local plugin_json="$1"
   [ -f "$plugin_json" ] || return 1
   sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$plugin_json" | head -1
-}
-
-latest_release_tag() {
-  # Prefer gh when available (authenticated or not); else HTTPS API via curl.
-  local tag=""
-  if command -v gh >/dev/null 2>&1; then
-    tag="$(gh api "repos/${REPO_SLUG}/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
-  fi
-  if [ -z "$tag" ] || [ "$tag" = "null" ]; then
-    require_cmd curl
-    local api_url="https://api.github.com/repos/${REPO_SLUG}/releases/latest"
-    assert_https_repo_url "$api_url"
-    tag="$(curl -fsSL "$api_url" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
-  fi
-  if [ -n "$tag" ] && [ "$tag" != "null" ]; then
-    printf '%s\n' "$tag"
-  else
-    printf 'main\n'
-  fi
 }
 
 download_tarball() {
@@ -204,7 +187,12 @@ install_tree() {
     return 0
   fi
 
-  mkdir -p "$bindir" "$libdir"
+  if ! mkdir -p "$bindir" "$libdir" 2>/dev/null; then
+    die "PREFIX not writable: cannot create $bindir (try --prefix ~/.local or fix permissions on $prefix)"
+  fi
+  if [ ! -w "$bindir" ] || [ ! -w "$libdir" ]; then
+    die "PREFIX not writable: $bindir (try --prefix ~/.local or fix permissions on $prefix)"
+  fi
 
   # Fresh install: replace libdir contents but keep other PREFIX files.
   # Use a staging dir then rename for atomic-ish replace.
@@ -306,9 +294,10 @@ main() {
 
   require_cmd curl
   # Prefer modern curl TLS flags when supported; still require HTTPS URLs.
+  # Default to main (tip) so curl|bash tracks the repo, not a possibly stale release.
   if [ -z "$REF" ]; then
-    REF="$(latest_release_tag)"
-    log "selected ref: $REF"
+    REF="main"
+    log "selected ref: $REF (default; pass --ref vX.Y.Z to pin a release)"
   fi
   REF="$(normalize_ref "$REF")"
 

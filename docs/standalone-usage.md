@@ -26,6 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/i
 midflight --version
 ```
 
+Default source ref is `main` (tip). Pin with `--ref vX.Y.Z` if you want a tagged release (releases may lag `main`).
 From a checkout: `./scripts/install.sh --from-dir . --prefix ~/.local`.
 Homebrew formula sketch (tap not published): `brew install --HEAD --formula ./Formula/midflight.rb`.
 

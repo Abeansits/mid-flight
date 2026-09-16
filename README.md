@@ -75,20 +75,20 @@ Claude already has the session, so it writes the context summary for you. It can
 
 Same engine, no Claude Code required. Use it from a terminal, a script, or CI. You supply the question (and optionally the context).
 
-**Install (recommended)** — puts `midflight` on your `PATH` without a manual `ln -s` from a clone:
+**Install (recommended)** — puts `midflight` on your `PATH` without a manual `ln -s` from a clone. The one-liner installs from **`main`** (repo tip):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
 midflight --version
 ```
 
-Pin a release tag once it exists (install script + matching source tarball):
+Published GitHub releases may lag plugin metadata on `main`. Pin a release tag only when you want that exact tree (install script + matching source tarball):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/vX.Y.Z/scripts/install.sh | bash -s -- --ref vX.Y.Z
 ```
 
-Defaults: install prefix is `/usr/local` when writable, otherwise `~/.local`. Override with `PREFIX=…` or `--prefix`. Packaging can set `DESTDIR`.
+Defaults: source ref is `main`; install prefix is `/usr/local` when writable, otherwise `~/.local`. Override with `PREFIX=…` / `--prefix`, or `REF=…` / `--ref`. Packaging can set `DESTDIR`.
 
 From a checkout (offline / local):
 

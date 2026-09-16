@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline tests for scripts/install.sh (prefix-to-tmpdir, dry-run, DESTDIR).
+# Offline tests for scripts/install.sh (prefix-to-tmpdir, dry-run, DESTDIR, default ref).
 
 set -euo pipefail
 
@@ -85,5 +85,59 @@ if bash "$INSTALL_SH" --from-dir "$TEST_DIR/no-such-dir" --prefix "$TEST_DIR/x" 
   echo "FAIL: missing --from-dir should fail" >&2
   exit 1
 fi
+
+
+# --- default selected ref is main (dry-run; no network download) ---
+out="$(env -u REF -u MIDFLIGHT_REF bash "$INSTALL_SH" --dry-run 2>&1)"
+assert_contains "$out" "selected ref: main" "default REF should be main"
+assert_contains "$out" "would download ref main" "dry-run should plan main download"
+case "$out" in
+  *"selected ref: v"*|*"would download ref v"*)
+    echo "FAIL: default ref unexpectedly selected a release tag" >&2
+    echo "$out" >&2
+    exit 1
+    ;;
+esac
+
+# --- --ref v1.9.0 still selects that tag ---
+out="$(env -u REF -u MIDFLIGHT_REF bash "$INSTALL_SH" --ref v1.9.0 --dry-run 2>&1)"
+assert_contains "$out" "would download ref v1.9.0" "--ref v1.9.0 should select that tag"
+case "$out" in
+  *"would download ref main"*)
+    echo "FAIL: --ref v1.9.0 still planned main" >&2
+    echo "$out" >&2
+    exit 1
+    ;;
+esac
+
+# bare X.Y.Z normalizes to vX.Y.Z
+out="$(env -u REF -u MIDFLIGHT_REF bash "$INSTALL_SH" --ref 1.9.0 --dry-run 2>&1)"
+assert_contains "$out" "would download ref v1.9.0" "bare 1.9.0 should normalize to v1.9.0"
+
+# --- dry-run must not mkdir real ~/.local (HOME is test sandbox) ---
+[ ! -e "$HOME/.local" ] || {
+  # If something else created it earlier in this test file, remove and re-check.
+  rm -rf "$HOME/.local"
+}
+out="$(env -u REF -u MIDFLIGHT_REF -u PREFIX bash "$INSTALL_SH" --dry-run 2>&1)"
+assert_contains "$out" "PREFIX=$HOME/.local" "dry-run default prefix should be ~/.local under test HOME"
+[ ! -e "$HOME/.local" ] || {
+  echo "FAIL: dry-run created $HOME/.local" >&2
+  exit 1
+}
+
+# --- clearer error on unwritable PREFIX ---
+unwritable="$TEST_DIR/unwritable-prefix"
+mkdir -p "$unwritable"
+chmod 555 "$unwritable"
+err_file="$TEST_DIR/unwritable.err"
+if bash "$INSTALL_SH" --from-dir "$ROOT_DIR" --prefix "$unwritable" >/dev/null 2>"$err_file"; then
+  chmod 755 "$unwritable"
+  echo "FAIL: install into unwritable PREFIX should fail" >&2
+  exit 1
+fi
+chmod 755 "$unwritable"
+err="$(cat "$err_file")"
+assert_contains "$err" "PREFIX not writable" "unwritable PREFIX should say PREFIX not writable"
 
 echo "PASS: cli_install"
