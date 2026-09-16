@@ -127,6 +127,70 @@ EOF
   chmod +x "$TEST_DIR/bin/agy"
 }
 
+
+# Stub the grok CLI: capture prompt/flags and print a canned response.
+# Optional arg overrides the response text.
+write_grok_stub() {
+  local response="${1:-stub-grok-ok}"
+
+  cat > "$TEST_DIR/bin/grok" <<EOF
+#!/bin/bash
+set -euo pipefail
+prompt=""
+model=""
+effort=""
+output_format=""
+always_approve="no"
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -p|--single) prompt="\$2"; shift 2 ;;
+    -m|--model) model="\$2"; shift 2 ;;
+    --effort) effort="\$2"; shift 2 ;;
+    --output-format) output_format="\$2"; shift 2 ;;
+    --always-approve|--dangerously-skip-permissions|--yolo) always_approve="yes"; shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "\$prompt" > "$TEST_DIR/grok_prompt.txt"
+printf '%s' "\$model" > "$TEST_DIR/grok_model.txt"
+printf '%s' "\$effort" > "$TEST_DIR/grok_effort.txt"
+printf '%s' "\$output_format" > "$TEST_DIR/grok_output_format.txt"
+printf '%s' "\$always_approve" > "$TEST_DIR/grok_always_approve.txt"
+printf '%s\n' "$response"
+EOF
+  chmod +x "$TEST_DIR/bin/grok"
+}
+
+# Stub the claude CLI: capture prompt/flags and print a canned response.
+# Optional arg overrides the response text.
+write_claude_stub() {
+  local response="${1:-stub-claude-ok}"
+
+  cat > "$TEST_DIR/bin/claude" <<EOF
+#!/bin/bash
+set -euo pipefail
+prompt=""
+model=""
+output_format=""
+skip_permissions="no"
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -p|--print) prompt="\$2"; shift 2 ;;
+    --model|-m) model="\$2"; shift 2 ;;
+    --output-format) output_format="\$2"; shift 2 ;;
+    --dangerously-skip-permissions) skip_permissions="yes"; shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "\$prompt" > "$TEST_DIR/claude_prompt.txt"
+printf '%s' "\$model" > "$TEST_DIR/claude_model.txt"
+printf '%s' "\$output_format" > "$TEST_DIR/claude_output_format.txt"
+printf '%s' "\$skip_permissions" > "$TEST_DIR/claude_skip_permissions.txt"
+printf '%s\n' "$response"
+EOF
+  chmod +x "$TEST_DIR/bin/claude"
+}
+
 assert_eq() {
   local expected="$1"
   local actual="$2"

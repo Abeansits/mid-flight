@@ -19,6 +19,8 @@ provider_display_name() {
     agy|antigravity) printf '%s\n' "Antigravity" ;;
     opencode) printf '%s\n' "OpenCode" ;;
     oz) printf '%s\n' "Oz" ;;
+    grok|grok-build) printf '%s\n' "Grok" ;;
+    claude) printf '%s\n' "Claude" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -226,6 +228,59 @@ query_oz() {
     2> "$PROVIDER_LOG_FILE"
 }
 
+
+query_grok() {
+  local full_prompt="$1"
+  local output_file="$2"
+  local args=(-p "$full_prompt" --output-format plain)
+
+  prepare_provider_run \
+    "grok" \
+    "grok.log" \
+    "Error: Grok query failed. Make sure the Grok CLI is installed and authenticated."
+
+  if [ -n "$grok_model" ]; then
+    args+=(-m "$grok_model")
+  fi
+
+  if [ -n "$grok_effort" ]; then
+    args+=(--effort "$grok_effort")
+  fi
+
+  # Consult/video stay gated; implement must auto-approve tool calls.
+  if [ "${MODE:-}" = "implement" ]; then
+    args+=(--always-approve)
+  fi
+
+  grok "${args[@]}" \
+    > "$output_file" \
+    2> "$PROVIDER_LOG_FILE"
+}
+
+query_claude() {
+  local full_prompt="$1"
+  local output_file="$2"
+  local args=(-p "$full_prompt" --output-format text)
+
+  prepare_provider_run \
+    "claude" \
+    "claude.log" \
+    "Error: Claude query failed. Make sure the Claude Code CLI is installed and authenticated."
+
+  if [ -n "$claude_model" ]; then
+    args+=(--model "$claude_model")
+  fi
+
+  # Consult/video stay gated; implement must skip permission prompts to edit.
+  if [ "${MODE:-}" = "implement" ]; then
+    args+=(--dangerously-skip-permissions)
+  fi
+
+  claude "${args[@]}" \
+    > "$output_file" \
+    2> "$PROVIDER_LOG_FILE"
+}
+
 run_provider_command() {
   local provider_name="$1"
   local full_prompt="$2"
@@ -248,10 +303,16 @@ run_provider_command() {
     oz)
       query_oz "$full_prompt" "$output_file"
       ;;
+    grok)
+      query_grok "$full_prompt" "$output_file"
+      ;;
+    claude)
+      query_claude "$full_prompt" "$output_file"
+      ;;
     *)
       error_exit \
         "unknown provider: $provider_name" \
-        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz. Check ~/.config/mid-flight/config"
+        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz, grok, claude. Check ~/.config/mid-flight/config"
       ;;
   esac
 }

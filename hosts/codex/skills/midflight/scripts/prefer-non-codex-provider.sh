@@ -3,7 +3,7 @@
 #
 # When the MidFlight host is Codex and the configured/default provider is also
 # codex, consulting Codex from Codex is usually a no-op second opinion.
-# Prefer a different provider (agy → opencode → oz → gemini) unless the user
+# Prefer a different provider (agy → opencode → oz → gemini → grok → claude) unless the user
 # explicitly opts in.
 #
 # Usage:
@@ -50,7 +50,7 @@ if [ "${MIDFLIGHT_ALLOW_CODEX_PROVIDER:-}" = "1" ]; then
 fi
 
 pick=""
-for candidate in agy opencode oz gemini; do
+for candidate in agy opencode oz gemini grok claude; do
   if command -v "$candidate" >/dev/null 2>&1; then
     pick="$candidate"
     break
@@ -65,6 +65,6 @@ if [ -n "$pick" ]; then
 fi
 
 printf 'prefer-non-codex-provider: refused circular Codex→Codex consultation.\n' >&2
-printf 'No alternate provider (agy, opencode, oz, gemini) found on PATH.\n' >&2
+printf 'No alternate provider (agy, opencode, oz, gemini, grok, claude) found on PATH.\n' >&2
 printf 'Install one of those CLIs, or set MIDFLIGHT_ALLOW_CODEX_PROVIDER=1 to override.\n' >&2
 exit 1

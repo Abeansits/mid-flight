@@ -1,8 +1,8 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 user-invocable: true
-argument-hint: "[question | --video <path-or-url> [prompt] | --provider <name>]"
+argument-hint: "[question | --video <path-or-url> [prompt] | --provider <name> | --allow-grok-provider]"
 metadata:
   author: Abeansits
   short-description: Outside-model consult via MidFlight
@@ -14,11 +14,11 @@ You've been invoked to consult an **external** model through MidFlight's configu
 
 Supports text consultation, implementation delegation, and **video analysis**.
 
-## Provider note (no circular Grok→Grok yet)
+## Circular provider guard
 
-There is **no** `provider=grok` in MidFlight today. Running this skill from Grok Build with the default `provider=codex` (or `agy` / `opencode` / `oz` / `gemini`) is the intended path — those are different harnesses, not a circular self-consult.
+`provider=grok` on the Grok Build host is circular. MidFlight prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or pass `--allow-grok-provider` (required for an explicit `--provider grok`).
 
-When a first-class `grok` provider lands (see ROADMAP), revisit whether a circular guard is needed. Until then, do not invent a `provider=grok` flag.
+The default provider is often `codex`, which is already a fine external consult — no rewrite needed unless config sets `provider=grok`.
 
 ## Engine resolution
 
@@ -45,7 +45,8 @@ If resolution fails, tell the user to install the standalone CLI (`ln -s …/bin
    - **`--video <file-or-url>`** — Video analysis. Extract the video source and any remaining text as the question/prompt.
    - **Text question** — Standard text consultation.
    - **Empty** — Identify what would most benefit from a second opinion from the conversation so far.
-   - **`--provider <name>`** — Forward to the runner if present (`codex`, `agy`, `opencode`, `oz`, `gemini`).
+   - **`--provider <name>`** — Forward to the runner if present (`codex`, `agy`, `opencode`, `oz`, `gemini`, `grok`, `claude`). `--provider grok` requires `--allow-grok-provider`.
+   - **`--allow-grok-provider`** — Allow circular `provider=grok` on this host.
 
 3. **Classify intent** — Set `INTENT` to one of:
 

@@ -42,7 +42,7 @@ version() {
 
 usage() {
   cat <<'EOF'
-midflight — consult Codex, Gemini, Antigravity, OpenCode, or Oz from any terminal.
+midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any terminal.
 
 Usage:
   midflight [OPTIONS] [QUESTION...]
@@ -51,7 +51,7 @@ Usage:
 
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
       --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
@@ -205,6 +205,8 @@ build_config_home() {
         agy|antigravity)   model_key="agy_model" ;;
         opencode)          model_key="opencode_model" ;;
         oz)                model_key="oz_model" ;;
+        grok|grok-build)   model_key="grok_model" ;;
+        claude)            model_key="claude_model" ;;
         *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
       esac
       write_model_key "$model_key"

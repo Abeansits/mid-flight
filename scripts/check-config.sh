@@ -75,6 +75,8 @@ main() {
   report_provider_status "codex" "Codex (optional alternate provider)" "optional" || true
   report_provider_status "opencode" "OpenCode (optional alternate provider)" "optional" || true
   report_provider_status "oz" "Oz (optional alternate provider)" "optional" || true
+  report_provider_status "grok" "Grok (optional alternate provider)" "optional" || true
+  report_provider_status "claude" "Claude (optional alternate provider)" "optional" || true
 
   if [ "$status" -eq 0 ]; then
     printf 'PASS: MidFlight config looks good\n'

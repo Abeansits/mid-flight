@@ -70,7 +70,7 @@ if [ ${#PROVIDER_ARGS[@]} -eq 0 ]; then
     [ "$provider" = "antigravity" ] && provider="agy"
     if [ "$provider" = "codex" ] && [ "${MIDFLIGHT_ALLOW_CODEX_PROVIDER:-}" != "1" ]; then
       pick=""
-      for c in agy opencode oz gemini; do
+      for c in agy opencode oz gemini grok claude; do
         command -v "$c" >/dev/null 2>&1 && { pick="$c"; break; }
       done
       if [ -z "$pick" ]; then

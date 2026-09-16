@@ -12,6 +12,9 @@ opencode_format="default"
 oz_model="auto"
 oz_output_format="text"
 oz_profile=""
+grok_model=""
+grok_effort=""
+claude_model=""
 CONFIG_VALIDATION_ISSUES=()
 AGY_INSTALL_URL="https://antigravity.google/docs/cli/install"
 GEMINI_INSTALL_URL="https://github.com/google-gemini/gemini-cli"
@@ -42,7 +45,7 @@ format_config_validation_issues() {
 
 supported_config_key() {
   case "$1" in
-    provider|codex_model|codex_reasoning_effort|gemini_model|agy_model|agy_effort|opencode_model|opencode_variant|opencode_format|oz_model|oz_output_format|oz_profile)
+    provider|codex_model|codex_reasoning_effort|gemini_model|agy_model|agy_effort|opencode_model|opencode_variant|opencode_format|oz_model|oz_output_format|oz_profile|grok_model|grok_effort|claude_model)
       return 0
       ;;
     *)
@@ -101,17 +104,28 @@ load_config() {
     value="$(config_value oz_profile "$config_file")"
     [ -n "$value" ] && oz_profile="$value"
 
-    log "config loaded: provider=$provider"
+    value="$(config_value grok_model "$config_file")"
+    [ -n "$value" ] && grok_model="$value"
+
+    value="$(config_value grok_effort "$config_file")"
+    [ -n "$value" ] && grok_effort="$value"
+
+    value="$(config_value claude_model "$config_file")"
+    [ -n "$value" ] && claude_model="$value"
   else
     log "no config file found at $config_file, using defaults"
   fi
 
   normalize_provider
+  log "config loaded: provider=$provider"
 }
 
 normalize_provider() {
   if [ "$provider" = "antigravity" ]; then
     provider="agy"
+  fi
+  if [ "$provider" = "grok-build" ]; then
+    provider="grok"
   fi
 }
 
@@ -147,9 +161,9 @@ validate_config_file_syntax() {
 
 validate_loaded_config() {
   case "$provider" in
-    codex|gemini|agy|opencode|oz) ;;
+    codex|gemini|agy|opencode|oz|grok|claude) ;;
     *)
-      add_config_validation_issue "Unsupported provider '$provider'. Supported providers: codex, gemini, agy, opencode, oz."
+      add_config_validation_issue "Unsupported provider '$provider'. Supported providers: codex, gemini, agy, opencode, oz, grok, claude."
       ;;
   esac
 
@@ -172,6 +186,13 @@ validate_loaded_config() {
     ""|low|medium|high) ;;
     *)
       add_config_validation_issue "Unsupported agy_effort '$agy_effort'. Use low, medium, high, or leave blank."
+      ;;
+  esac
+
+  case "$grok_effort" in
+    ""|low|medium|high) ;;
+    *)
+      add_config_validation_issue "Unsupported grok_effort '$grok_effort'. Use low, medium, high, or leave blank."
       ;;
   esac
 
@@ -251,6 +272,8 @@ ensure_provider_available() {
     agy) install_url="$AGY_INSTALL_URL" ;;
     opencode) install_url="https://opencode.ai/docs/cli/" ;;
     oz) install_url="https://docs.warp.dev/reference/cli/cli" ;;
+    grok) install_url="https://docs.x.ai/build/cli/reference" ;;
+    claude) install_url="https://code.claude.com/docs/en/headless" ;;
   esac
 
   error_exit \
