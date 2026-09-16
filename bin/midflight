@@ -62,9 +62,9 @@ Options:
       --git-status        append current branch + git status under Context
       --diff              append git diff (working tree) and staged diff under Context
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
-      --timeout SECONDS   hard bound on the provider call (default: off/0; when N>0 the
+      --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
-                          so provider children die too; no coreutils needed)
+                          so provider children die too; no coreutils needed; dual ≈ 2N wall)
   -h, --help             show this help
   -V, --version          show version
 
@@ -72,7 +72,8 @@ Dual-consult (--dual / --providers): same question to two providers, print both
 answers and a light structural note. Consult-only in v1 (refuse implement/video).
 Primary UX: midflight --dual agy "…" (primary from config or -p). Explicit form:
 midflight --providers codex,agy "…". Sequential; if one fails, the other is still
-shown. MidFlight does not synthesize a merged opinion.
+shown. MidFlight does not synthesize a merged opinion. --timeout applies per side
+(~2N wall-clock for dual).
 
 Git context (--git-status / --diff) is capped at 100 KiB (102400 bytes) per
 section. Raise via MIDFLIGHT_GIT_CONTEXT_MAX_BYTES. Requires a git repo and git
@@ -119,7 +120,12 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -m|--mode)       MODE="${2:-}"; shift 2 ;;
     -p|--provider)   PROVIDER="${2:-}"; shift 2 ;;
-    --dual)          DUAL_PROVIDER="${2:-}"; shift 2 ;;
+    --dual)
+      [ $# -ge 2 ] || die "--dual requires a provider name (usage: midflight --dual PROVIDER \"…\")"
+      [ -n "$2" ] || die "--dual requires a provider name (got empty string)"
+      DUAL_PROVIDER="$2"
+      shift 2
+      ;;
     --providers)     PROVIDERS_LIST="${2:-}"; shift 2 ;;
     --model)         MODEL="${2:-}"; shift 2 ;;
     -c|--config)     CONFIG_FILE="${2:-}"; shift 2 ;;

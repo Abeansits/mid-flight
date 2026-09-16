@@ -108,6 +108,31 @@ set -e
 assert_eq "2" "$bad_status" "model+dual should exit 2"
 assert_contains "$bad" "--model cannot be combined with dual-consult" "model dual refusal"
 
+# --dual with no argument: clear usage die (exit 2), not silent shift failure
+set +e
+bad="$(run_cli --dual 2>&1)"
+bad_status=$?
+set -e
+assert_eq "2" "$bad_status" "--dual without provider should exit 2"
+assert_contains "$bad" "--dual requires a provider name" "missing --dual arg should die with usage"
+
+# --dual empty string: refuse, do not fall through to single-consult
+set +e
+bad="$(run_cli --dual "" "x" 2>&1)"
+bad_status=$?
+set -e
+assert_eq "2" "$bad_status" "--dual empty string should exit 2"
+assert_contains "$bad" "--dual requires a provider name" "empty --dual should die, not single-consult"
+assert_contains "$bad" "got empty string" "empty --dual should mention empty string"
+
+# Refuse --providers + -p
+set +e
+bad="$(run_cli -p codex --providers codex,agy "x" 2>&1)"
+bad_status=$?
+set -e
+assert_eq "2" "$bad_status" "providers+-p should exit 2"
+assert_contains "$bad" "do not also pass -p" "providers+-p refusal message"
+
 # Alias normalization: antigravity → agy
 write_codex_stub "a"
 write_agy_stub "b"

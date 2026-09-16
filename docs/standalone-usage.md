@@ -54,8 +54,8 @@ midflight [OPTIONS] [QUESTION...]
       --git-status       append current branch + `git status` under Context
       --diff             append `git diff` (working tree) and staged diff under Context
       --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
-      --timeout SECONDS  hard bound on provider call (default off; N>0 enables
-                         portable watchdog + pg kill, no coreutils needed)
+      --timeout SECONDS  hard bound on each provider call (default off; N>0 enables
+                         portable watchdog + pg kill; dual ≈ 2N wall)
   -h, --help             show help
   -V, --version          show version
 ```
@@ -83,6 +83,7 @@ Rules for v1:
 - Sequential engine runs (same assembled query file / `--query-file`).
 - Stdout is a labeled dump (`## Provider A` / `## Provider B`) plus a short `## Where they differ` note that is structural only (identical-after-trim, or “compare them yourself”). MidFlight does **not** invent a merged opinion or LLM disagreement analysis.
 - If one provider fails, the successful answer is still printed and the failed side shows its error; exit status is `1`.
+- `--timeout` applies per side (~2N wall-clock for dual).
 - `--model` is not combined with dual (set per-provider models in config). `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
 
 ### Git-derived context
