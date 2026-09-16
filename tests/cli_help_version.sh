@@ -13,6 +13,8 @@ assert_contains "$help_output" "--provider" "--help should list the provider fla
 assert_contains "$help_output" "--video" "--help should list the video flag"
 assert_contains "$help_output" "--git-status" "--help should list --git-status"
 assert_contains "$help_output" "--diff" "--help should list --diff"
+assert_contains "$help_output" "--dual" "--help should list --dual"
+assert_contains "$help_output" "--providers" "--help should list --providers"
 
 short_help="$(run_cli -h)"
 assert_eq "$help_output" "$short_help" "-h and --help should print the same help"
