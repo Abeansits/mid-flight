@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini
+description: Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude for a second opinion mid-development, or analyze video with Antigravity/Gemini
 model: opus
 allowed-tools: Bash, Read, Glob, Grep, Write
 user-invocable: true
@@ -8,9 +8,11 @@ user-invocable: true
 
 # MidFlight — Mid-Development Consultation
 
-You've been invoked to consult an external model through MidFlight's configured provider (Codex, Gemini, Antigravity, OpenCode, or Oz) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
+You've been invoked to consult an external model through MidFlight's configured provider (Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude) for a second opinion. This could be user-triggered (`/midflight`) or self-triggered when you recognize you're stuck.
 
 Supports text consultation, implementation delegation, and **video analysis** (scene breakdowns, ad review, quality checks).
+
+**Circular warning:** `provider=claude` from Claude Code is circular (same harness). Prefer `codex`, `agy`, `opencode`, `oz`, `gemini`, or `grok` in `~/.config/mid-flight/config` (or pass another provider via the CLI when using `midflight -p`). Do not set `provider=claude` as the MidFlight default while hosting from Claude Code unless you deliberately want a same-CLI second pass.
 
 ## Your job
 

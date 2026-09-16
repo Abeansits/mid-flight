@@ -2,8 +2,7 @@
 # Skill-local entrypoint. Prefers hosts/grok/scripts when the repo tree is
 # intact; otherwise requires midflight on PATH or MIDFLIGHT_ROOT.
 # Works when only this skill dir + MIDFLIGHT_ROOT engine are installed:
-# query.sh has no -p flag, so provider override is staged via a temp HOME config
-# (same pattern as the Codex host MIDFLIGHT_ROOT path).
+# circular-guard lives in skill/scripts (bundled) or hosts/grok/scripts.
 set -euo pipefail
 
 SKILL_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,9 +22,20 @@ if [ -z "${MIDFLIGHT_ROOT:-}" ] && ! command -v midflight >/dev/null 2>&1; then
   exit 1
 fi
 
+# Circular guard: skill-bundled → host scripts → MIDFLIGHT_ROOT hosts tree.
+GUARD=""
+if [ -f "$SKILL_SCRIPTS/prefer-non-grok-provider.sh" ]; then
+  GUARD="$SKILL_SCRIPTS/prefer-non-grok-provider.sh"
+elif [ -n "$HOST_SCRIPTS" ] && [ -f "$HOST_SCRIPTS/prefer-non-grok-provider.sh" ]; then
+  GUARD="$HOST_SCRIPTS/prefer-non-grok-provider.sh"
+elif [ -n "${MIDFLIGHT_ROOT:-}" ] && [ -f "$MIDFLIGHT_ROOT/hosts/grok/scripts/prefer-non-grok-provider.sh" ]; then
+  GUARD="$MIDFLIGHT_ROOT/hosts/grok/scripts/prefer-non-grok-provider.sh"
+fi
+
 PROVIDER_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    --allow-grok-provider) export MIDFLIGHT_ALLOW_GROK_PROVIDER=1; shift ;;
     --provider)
       if [ -z "${2:-}" ]; then
         printf 'midflight skill: --provider needs a value\n' >&2
@@ -37,6 +47,47 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
+
+# Always require allow for explicit --provider grok (even without GUARD).
+explicit_provider=""
+if [ ${#PROVIDER_ARGS[@]} -ge 2 ]; then
+  explicit_provider="${PROVIDER_ARGS[1]}"
+  [ "$explicit_provider" = "grok-build" ] && explicit_provider="grok"
+fi
+if [ "$explicit_provider" = "grok" ] \
+  && [ "${MIDFLIGHT_ALLOW_GROK_PROVIDER:-}" != "1" ]; then
+  printf 'midflight skill: --provider grok requires --allow-grok-provider\n' >&2
+  exit 1
+fi
+
+if [ ${#PROVIDER_ARGS[@]} -eq 0 ]; then
+  if [ -n "$GUARD" ]; then
+    provider="$(bash "$GUARD")"
+  else
+    # Minimal inline guard when no prefer script was installed.
+    provider="codex"
+    cfg="${HOME}/.config/mid-flight/config"
+    if [ -f "$cfg" ]; then
+      v="$(grep '^provider=' "$cfg" | cut -d= -f2- | tr -d '[:space:]' || true)"
+      [ -n "$v" ] && provider="$v"
+    fi
+    [ "$provider" = "antigravity" ] && provider="agy"
+    [ "$provider" = "grok-build" ] && provider="grok"
+    if [ "$provider" = "grok" ] && [ "${MIDFLIGHT_ALLOW_GROK_PROVIDER:-}" != "1" ]; then
+      pick=""
+      for c in codex agy opencode oz gemini claude; do
+        command -v "$c" >/dev/null 2>&1 && { pick="$c"; break; }
+      done
+      if [ -z "$pick" ]; then
+        printf 'midflight skill: refused circular Grok→Grok (no alternate provider on PATH).\n' >&2
+        exit 1
+      fi
+      printf 'midflight skill: host=Grok provider=grok → using %s (set MIDFLIGHT_ALLOW_GROK_PROVIDER=1 to force).\n' "$pick" >&2
+      provider="$pick"
+    fi
+  fi
+  PROVIDER_ARGS=(-p "$provider")
+fi
 
 invoke_midflight() {
   local mf="$1"
@@ -63,17 +114,11 @@ if [ -n "${MIDFLIGHT_ROOT:-}" ] && [ -x "$MIDFLIGHT_ROOT/bin/midflight" ]; then
   invoke_midflight "$MIDFLIGHT_ROOT/bin/midflight" "$@"
 fi
 
-# query.sh has no -p flag: stage provider via a temporary HOME config (same as
-# hosts/grok/scripts/run-query.sh). If no --provider was given, pass through
-# without staging so the engine uses the user's real config.
-if [ ${#PROVIDER_ARGS[@]} -eq 0 ]; then
-  exec bash "$MIDFLIGHT_ROOT/scripts/query.sh" "$@"
-fi
-
+# query.sh has no -p flag: stage provider via a temporary HOME config (same as run-query.sh).
 provider="${PROVIDER_ARGS[1]}"
 tmp_home="$(mktemp -d "${TMPDIR:-/tmp}/midflight-grok-home.XXXXXX")"
-# shellcheck disable=SC2064
-trap 'rm -rf -- "$tmp_home"' EXIT
+cleanup() { rm -rf "$tmp_home"; }
+trap cleanup EXIT
 mkdir -p "$tmp_home/.config/mid-flight"
 config_src="${HOME}/.config/mid-flight/config"
 if [ -f "$config_src" ]; then

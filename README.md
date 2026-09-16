@@ -2,7 +2,7 @@
 
 **Get a second opinion from another coding agent without leaving the one you're already in.**
 
-You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, Antigravity, or Gemini, then brings their answer back into your session.
+You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude, then brings their answer back into your session.
 
 No copy-paste. No rebuilding context. No switching tools.
 
@@ -51,6 +51,8 @@ You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 - [Oz CLI](https://docs.warp.dev/reference/cli/cli)
 - [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`) — Google's current terminal agent
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — enterprise / paid API key only (see [Gemini note](#gemini-cli-status))
+- [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`)
+- [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — useful as a provider from non-Claude hosts
 
 ### 1. Claude Code plugin
 
@@ -126,7 +128,7 @@ $midflight                          # Codex picks the question from the session
 $midflight-check-config             # validate provider setup
 ```
 
-Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
+Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
 
 ### 4. Grok Build skills
 
@@ -167,7 +169,7 @@ Restart Grok Build (or open the extensions modal with `/skills`), then:
 /midflight-check-config             # validate provider setup
 ```
 
-There is **no** `provider=grok` yet, so circular `host=Grok` + `provider=grok` does not apply. The default provider is often `codex`, which is a fine external consult from Grok Build.
+Because the host is Grok Build, MidFlight will **not** silently use `provider=grok` (circular). It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` (or pass `--allow-grok-provider`) to force Grok anyway. The default provider is often `codex`, which is already a fine external consult.
 
 
 ### 5. Cursor skills
@@ -226,8 +228,12 @@ There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cur
 | `opencode` | Yes | Yes | No | `opencode_model` | `opencode_variant`, `opencode_format` |
 | `oz` | Yes | Yes | No | `oz_model` | `oz_output_format`, `oz_profile` |
 | `gemini` | Yes | Yes | Yes | `gemini_model` | — |
+| `grok` | Yes | Yes | No | `grok_model` | `grok_effort` |
+| `claude` | Yes | Yes | No | `claude_model` | — |
 
-`provider=antigravity` is an alias for `agy`.
+`provider=antigravity` is an alias for `agy`. `provider=grok-build` is an alias for `grok`.
+
+From Claude Code, prefer a non-`claude` provider — `provider=claude` is circular on that host (same harness consulting itself).
 
 Video uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
 
@@ -252,11 +258,14 @@ opencode_format=default
 oz_model=auto
 oz_output_format=text
 oz_profile=
+grok_model=
+grok_effort=
+claude_model=
 ```
 
 | Setting | Default | Description |
 |---|---|---|
-| `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, or `oz` |
+| `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude` |
 | `codex_model` | `gpt-5.4` | Codex model |
 | `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
@@ -268,6 +277,9 @@ oz_profile=
 | `oz_model` | `auto` | `auto` is the general-purpose default; `auto-genius` for heavy consults |
 | `oz_output_format` | `text` | Capture format |
 | `oz_profile` | unset | Optional Oz agent profile |
+| `grok_model` | unset | Grok model id; blank uses the CLI default |
+| `grok_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
+| `claude_model` | unset | Claude model; blank uses the CLI default |
 
 Config is independent of Claude Code (or any other host), so you can tune MidFlight without touching other tools.
 
@@ -291,11 +303,15 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 | `'gemini' CLI not found` | Gemini not installed / not on `PATH` | Consumer access ended 18 Jun 2026 — [install agy](https://antigravity.google/docs/cli/install), or Gemini with an enterprise/API-key install |
 | `'opencode' CLI not found` | OpenCode not installed / not on `PATH` | [Install OpenCode](https://opencode.ai/docs/cli/) |
 | `'oz' CLI not found` | Oz not installed / not on `PATH` | [Install Oz](https://docs.warp.dev/reference/cli/cli) |
+| `'grok' CLI not found` | Grok Build not installed / not on `PATH` | [Install Grok](https://docs.x.ai/build/cli/reference) |
+| `'claude' CLI not found` | Claude Code CLI not installed / not on `PATH` | [Install Claude Code](https://code.claude.com/docs/en/headless) |
 | `Codex query failed` | Auth or network | `codex --version`; check API key |
 | `Codex query failed` with `unexpected argument '--flag'` | Installed Codex CLI dropped a flag MidFlight still passes | Upgrade MidFlight; this is a CLI contract mismatch, not auth |
 | `Antigravity query failed` | Auth or provider error | `agy --version`; run `agy` once to sign in |
 | `OpenCode query failed` | Auth or provider error | `opencode --help`; confirm credentials inside OpenCode |
 | `Oz query failed` | Auth or provider error | `oz --help` or `oz whoami` |
+| `Grok query failed` | Auth or provider error | `grok --version`; run `grok login` |
+| `Claude query failed` | Auth or provider error | `claude --version`; confirm Claude Code login |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin and is waiting for EOF | Upgrade MidFlight; stdin is now detached |
 | `Video file exceeds 20MB limit` | Gemini inline-file limit | Compress or trim the video |
@@ -339,7 +355,7 @@ MidFlight is a thin router over other agents' CLIs.
 
 - **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), Cursor (`/midflight` skills under `hosts/cursor/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
-- **Provider** — `codex`, `agy`, `gemini`, `opencode`, or `oz`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
+- **Provider** — `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
 Each invocation gets its own temp run workspace for staged inputs, prompt assembly, provider logs, and response capture. Stdin is detached before launching provider CLIs so a caller with an open pipe cannot deadlock Codex.
 

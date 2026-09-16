@@ -32,7 +32,7 @@ This skill runs **inside Codex**. If MidFlight's provider is also `codex`, a con
 Default behavior (safest / least surprising):
 
 - Warn on stderr
-- Prefer the first available alternate on `PATH`: `agy` → `opencode` → `oz` → `gemini`
+- Prefer the first available alternate on `PATH`: `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude`
 - If none are available, **refuse** and explain how to fix
 
 Explicit override (only when the user clearly wants Codex anyway):

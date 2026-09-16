@@ -1,7 +1,7 @@
 # Standalone CLI usage
 
 `bin/midflight` is a thin wrapper over MidFlight's engine (`scripts/query.sh`)
-that lets you consult Codex, Gemini, Antigravity, OpenCode, or Oz from any
+that lets you consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any
 terminal, script, or CI job — without Claude Code.
 
 The engine was always standalone; this wrapper just adds friendly argument
@@ -31,7 +31,7 @@ You can also run it in place with `./bin/midflight ...`.
 ### Prerequisites
 
 - `bash`
-- A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, or `oz`),
+- A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude`),
   installed and authenticated.
 - Optionally `~/.config/mid-flight/config` to pick the provider and models.
   Without it, the engine's defaults apply (provider `codex`). See the
@@ -43,7 +43,7 @@ You can also run it in place with `./bin/midflight ...`.
 midflight [OPTIONS] [QUESTION...]
 
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
       --model MODEL      model to use for the active provider (overrides config)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine

@@ -17,26 +17,28 @@ Still nice to have: a live `agy` run against a small local mp4. Stub tests cover
 
 ### 2a. Codex host adapter — shipped on `main` (v1.9.0, PR #14)
 
-Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
+Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini`/`grok`/`claude` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
 
 ### 2b. Grok Build host adapter — shipped on `main` (v1.9.0, PR #15)
 
-Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex. **No** circular guard: `provider=grok` does not exist yet, so default `provider=codex` (or another configured CLI) is the intended external consult from Grok. Install via copy/symlink into `~/.grok/skills/`, project `.grok/skills/`, or `~/.agents/skills/`.
+Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex. Circular `provider=grok` guard lands with item 3 (this PR). Default `provider=codex` remains a fine external consult from Grok. Install via copy/symlink into `~/.grok/skills/`, project `.grok/skills/`, or `~/.agents/skills/`.
 
-### 2c. Cursor host adapter — this PR
+### 2c. Cursor host adapter — shipped on `main` (v1.9.0, PR #16)
 
 Skills under `hosts/cursor/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex/Grok. **No** circular guard: `provider=cursor` does not exist yet (waitlisted `agent -p --mode=ask`), so default `provider=codex` is fine from Cursor. Install via copy/symlink into `~/.cursor/skills/`, project `.cursor/skills/`, or `~/.agents/skills/`; path-scoped `npx skills add Abeansits/mid-flight/hosts/cursor/skills --agent cursor` also works (plain repo install is ambiguous vs Codex/Grok skill names).
 
-With this PR, the planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Standalone CLI Path (a) shipped in PR #7. Path (b) did not: the CLI does not auto-summarize working context.
+The planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Standalone CLI Path (a) shipped in PR #7. Path (b) did not: the CLI does not auto-summarize working context.
 
 ## Next
 
-### 3. First-class provider harnesses (after host adapters)
+### 3. First-class provider harnesses — in progress (this PR → v1.10.0)
 
-Complementary *harnesses*, not “another model” (OpenCode can already route to many models). Queue after host adapters:
+Complementary *harnesses*, not “another model” (OpenCode can already route to many models):
 
-- `grok -p` as a first-class provider
-- Claude-as-provider (`claude -p` harness) — same class of work; run the Claude Code CLI as an external consult from other hosts
+- `grok -p` as a first-class provider (`provider=grok`, alias `grok-build`)
+- Claude-as-provider (`claude -p` harness; `provider=claude`) — run the Claude Code CLI as an external consult from other hosts
+- Grok host circular guard when `provider=grok` (prefer codex → agy → opencode → oz → gemini → claude; override via `MIDFLIGHT_ALLOW_GROK_PROVIDER=1`)
+- Claude host documents that `provider=claude` is circular from Claude Code
 
 Waitlist only: Cursor `agent -p --mode=ask`, GitHub Copilot `copilot -p`. Skip Aider / Amp / Crush unless someone asks.
 

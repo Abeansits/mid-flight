@@ -31,18 +31,20 @@ assert_skill "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" "midflight"
 assert_skill "$ROOT_DIR/hosts/grok/skills/midflight-check-config/SKILL.md" "midflight-check-config"
 
 grep -q 'provider=grok' "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" \
-  || { echo "FAIL: midflight skill should document that provider=grok does not exist yet" >&2; exit 1; }
-grep -qi 'yet' "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" \
-  || { echo "FAIL: midflight skill should note provider=grok is not available yet" >&2; exit 1; }
+  || { echo "FAIL: midflight skill should document provider=grok circularity" >&2; exit 1; }
+grep -qi 'circular' "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" \
+  || { echo "FAIL: midflight skill should document circular guard" >&2; exit 1; }
+grep -q 'MIDFLIGHT_ALLOW_GROK_PROVIDER' "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" \
+  || { echo "FAIL: midflight skill should document MIDFLIGHT_ALLOW_GROK_PROVIDER override" >&2; exit 1; }
 grep -q '/midflight' "$ROOT_DIR/hosts/grok/skills/midflight/SKILL.md" \
   || { echo "FAIL: midflight skill should document /midflight slash invoke" >&2; exit 1; }
 
 [ -f "$ROOT_DIR/hosts/grok/skills/midflight/scripts/run.sh" ]
+[ -f "$ROOT_DIR/hosts/grok/skills/midflight/scripts/prefer-non-grok-provider.sh" ]
 [ -f "$ROOT_DIR/hosts/grok/skills/midflight-check-config/scripts/run.sh" ]
 [ -f "$ROOT_DIR/hosts/grok/scripts/resolve-engine.sh" ]
 [ -f "$ROOT_DIR/hosts/grok/scripts/run-query.sh" ]
 [ -f "$ROOT_DIR/hosts/grok/scripts/run-check-config.sh" ]
-# No circular-provider guard for Grok (provider=grok does not exist)
-[ ! -f "$ROOT_DIR/hosts/grok/scripts/prefer-non-grok-provider.sh" ]
+[ -f "$ROOT_DIR/hosts/grok/scripts/prefer-non-grok-provider.sh" ]
 
 echo "PASS: host_grok_skill_frontmatter"

@@ -15,9 +15,11 @@ Agent Skills for [Grok Build](https://docs.x.ai/build/features/skills-plugins-ma
 2. `$MIDFLIGHT_ROOT` (checkout or install prefix)
 3. Walk up from the skill path to a mid-flight repo root
 
-## Provider note (no circular guard)
+## Circular provider guard
 
-MidFlight has **no** `provider=grok` yet, so `host=Grok` + `provider=grok` circularity is N/A. The default provider is often `codex`, which is a fine external consult from Grok Build. When a `grok` provider is added later, reconsider a circular guard (similar to the Codex host).
+When `provider=grok` (or alias `grok-build`), MidFlight refuses a silent Grok→Grok consult. It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or exits if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or `--allow-grok-provider`.
+
+The default provider is often `codex`, which is already a fine external consult from Grok Build (no rewrite needed).
 
 ## Install doors
 
