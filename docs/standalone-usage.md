@@ -60,6 +60,8 @@ midflight [OPTIONS] [QUESTION...]
   -V, --version          show version
 ```
 
+Modes for Codex: consult (and video, if Codex were ever selected) pass `--sandbox read-only`; `-m implement` passes `--sandbox workspace-write`. Other providers already gate write permissions by mode (agy/claude skip-permissions, grok `--always-approve`).
+
 ### Dual-consult
 
 Same question to two providers; print both answers. That is the product.

@@ -99,18 +99,24 @@ classify_provider_failure() {
 query_codex() {
   local full_prompt="$1"
   local output_file="$2"
+  local sandbox_mode="read-only"
 
   prepare_provider_run \
     "codex" \
     "codex.log" \
     "Error: Codex query failed. Make sure the Codex CLI is installed and authenticated."
 
-  # workspace-write is required: `codex exec` sandboxes to read-only by default,
-  # which blocks implement mode from applying the edits it is asked to make.
+  # `--sandbox` only gates model-generated shell/tool writes (codex-cli help),
+  # not host session/rollout files under $CODEX_HOME. Consult/video stay
+  # read-only; only implement needs workspace-write to apply edits.
+  if [ "${MODE:-}" = "implement" ]; then
+    sandbox_mode="workspace-write"
+  fi
+
   codex exec \
     --model "$codex_model" \
     -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
-    --sandbox workspace-write \
+    --sandbox "$sandbox_mode" \
     --skip-git-repo-check \
     -o "$output_file" \
     "$full_prompt" \
