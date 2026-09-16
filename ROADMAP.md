@@ -17,7 +17,7 @@ Still nice to have: a live `agy` run against a small local mp4. Stub tests cover
 
 ### 2a. Codex host adapter — shipped on `main` (v1.9.0, PR #14)
 
-Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
+Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), engine resolution (`PATH` → `MIDFLIGHT_ROOT` → repo walk-up), and a circular `host=Codex` + `provider=codex` guard that prefers `agy`/`opencode`/`oz`/`gemini`/`grok`/`claude` (override via `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`).
 
 ### 2b. Grok Build host adapter — shipped on `main` (v1.9.0, PR #15)
 
