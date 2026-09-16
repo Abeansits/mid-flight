@@ -49,12 +49,32 @@ midflight [OPTIONS] [QUESTION...]
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
+      --git-status       append current branch + `git status` under Context
+      --diff             append `git diff` (working tree) and staged diff under Context
       --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
       --timeout SECONDS  hard bound on provider call (default off; N>0 enables
                          portable watchdog + pg kill, no coreutils needed)
   -h, --help             show help
   -V, --version          show version
 ```
+
+### Git-derived context
+
+`--git-status` and `--diff` let the standalone CLI build a useful Context section
+from the current repo without hand-writing notes (and without Claude summarizing
+a session):
+
+- `--git-status` — current branch (`git branch --show-current`) plus
+  `git status` (color off)
+- `--diff` — `git diff` (working tree) and `git diff --cached` (staged); empty
+  sides are marked `(empty)`
+
+Both are combinable with `--context`, `-i/--include`, and an inline question.
+They require `git` on `PATH` and a work tree (clear exit 2 otherwise).
+
+Each git section is capped at **100 KiB (102400 bytes)**. Oversized output is
+truncated and ends with a `[midflight: truncated …]` marker. Raise the cap with
+`MIDFLIGHT_GIT_CONTEXT_MAX_BYTES` (positive integer bytes).
 
 ## Examples
 
@@ -89,11 +109,11 @@ midflight -f query.md
 ## How input is assembled
 
 - **Inline question** — `[QUESTION...]` becomes the `## Question` section. Any
-  `--context` file and `--include` globs are read and placed in a `## Context`
-  section above it.
+  `--context` file, `--include` globs, and `--git-status` / `--diff` output are
+  placed in a `## Context` section above it.
 - **`--query-file FILE`** — passed to the engine untouched (full compatibility
   with the existing `scripts/query.sh` contract). Cannot be combined with an
-  inline question, `--context`, or `--include`.
+  inline question, `--context`, `--include`, `--git-status`, or `--diff`.
 - **`--video FILE|URL`** — forces video mode and Gemini. Trailing text is the
   prompt; with no prompt the engine uses its default scene-breakdown prompt.
 
@@ -118,6 +138,7 @@ Your `~/.config/mid-flight/config` is never modified.
 
 - `0` — success (provider response on stdout; `[mid-flight]` logs on stderr).
 - `2` — usage error (bad mode, missing question, conflicting flags, missing
-  files passed to `--context`/`--config`/`--query-file`).
+  files passed to `--context`/`--config`/`--query-file`, or `--git-status`/`--diff`
+  used outside a git work tree / without `git` on PATH).
 - `1` — engine/provider error (missing provider CLI, invalid config, auth or
   network failure). These messages come straight from the engine.

@@ -57,6 +57,8 @@ Options:
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
   -i, --include GLOB     read matching files into the Context section (repeatable)
+      --git-status        append current branch + git status under Context
+      --diff              append git diff (working tree) and staged diff under Context
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
       --timeout SECONDS   hard bound on the provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
@@ -64,11 +66,17 @@ Options:
   -h, --help             show this help
   -V, --version          show version
 
+Git context (--git-status / --diff) is capped at 100 KiB (102400 bytes) per
+section. Raise via MIDFLIGHT_GIT_CONTEXT_MAX_BYTES. Requires a git repo and git
+on PATH. Combinable with --context / -i / an inline question.
+
 Examples:
   midflight "should we use SSE or WebSockets here?"
   midflight -p agy "is this regex safe against ReDoS?"
   midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
   midflight --context notes.md -i "src/*.ts" "where is the leak?"
+  midflight --git-status --diff "does this change look right?"
+  midflight --diff --context notes.md "any race conditions in the unstaged work?"
   midflight -m implement -f request.md
   midflight --video ./ad.mp4 "does this match the storyboard?"
 
@@ -87,8 +95,12 @@ MODEL=""
 CONFIG_FILE=""
 QUERY_FILE=""
 CONTEXT_FILE=""
+GIT_STATUS=0
+GIT_DIFF=0
 VIDEO_SOURCE=""
 TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
+# Per-section cap for --git-status / --diff output (bytes). Override with MIDFLIGHT_GIT_CONTEXT_MAX_BYTES.
+GIT_CONTEXT_MAX_BYTES="${MIDFLIGHT_GIT_CONTEXT_MAX_BYTES:-102400}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -99,6 +111,8 @@ while [ $# -gt 0 ]; do
     -f|--query-file) QUERY_FILE="${2:-}"; shift 2 ;;
     --context)       CONTEXT_FILE="${2:-}"; shift 2 ;;
     -i|--include)    INCLUDES+=("${2:-}"); shift 2 ;;
+    --git-status)    GIT_STATUS=1; shift ;;
+    --diff)          GIT_DIFF=1; shift ;;
     --video)         VIDEO_SOURCE="${2:-}"; shift 2 ;;
     --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help)       usage; exit 0 ;;
@@ -122,6 +136,10 @@ if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
   die "invalid --timeout '$TIMEOUT' (non-negative integer seconds expected; 0 disables the bound)"
 fi
 [ "${TIMEOUT:-120}" -le 0 ] && TIMEOUT=0  # 0 = no timeout bound (user override)
+
+if ! [[ "$GIT_CONTEXT_MAX_BYTES" =~ ^[0-9]+$ ]] || [ "$GIT_CONTEXT_MAX_BYTES" -le 0 ]; then
+  die "invalid MIDFLIGHT_GIT_CONTEXT_MAX_BYTES '$GIT_CONTEXT_MAX_BYTES' (positive integer bytes expected)"
+fi
 
 QUESTION="${POSITIONAL[*]:-}"
 
@@ -216,8 +234,77 @@ build_config_home() {
   CONFIG_HOME="$home_dir"
 }
 
-# Assemble an inline question (+ optional context/includes) into a query file,
-# mirroring the "## Context / ## Question" structure the plugin produces.
+# Cap a blob to GIT_CONTEXT_MAX_BYTES and print it. On truncation, append a
+# clear marker so the model (and the user reading the assembled query) know.
+print_capped() {
+  local label="$1"
+  local content="$2"
+  local max="$GIT_CONTEXT_MAX_BYTES"
+  local size
+  size="$(printf '%s' "$content" | wc -c | tr -d '[:space:]')"
+  if [ "$size" -le "$max" ]; then
+    printf '%s' "$content"
+    # Ensure the section ends with a newline when non-empty.
+    [ "$size" -eq 0 ] || [[ "$content" == *$'\n' ]] || printf '\n'
+    return 0
+  fi
+  printf '%s' "$content" | head -c "$max"
+  printf '\n\n[midflight: truncated %s at %s bytes; set MIDFLIGHT_GIT_CONTEXT_MAX_BYTES to raise the limit]\n' \
+    "$label" "$max"
+}
+
+# Fail fast when --git-status / --diff need git but the cwd is not a repo
+# (or git is missing from PATH).
+require_git_repo() {
+  if ! command -v git >/dev/null 2>&1; then
+    die "git is required for --git-status/--diff but was not found on PATH"
+  fi
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    die "not a git repository (or any parent); --git-status/--diff require a work tree"
+  fi
+}
+
+# Append git-derived subsections (branch/status and/or diffs) into the Context
+# body. Color is forced off so the prompt stays plain text.
+append_git_context() {
+  local branch="" status="" unstaged="" staged=""
+  local cap=$((GIT_CONTEXT_MAX_BYTES + 1))
+
+  require_git_repo
+
+  if [ "$GIT_STATUS" -eq 1 ]; then
+    branch="$(git branch --show-current 2>/dev/null || true)"
+    if [ -z "$branch" ]; then
+      branch="detached HEAD @ $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    fi
+    status="$(git -c color.ui=false status 2>&1)" || true
+    printf '\n### git branch\n'
+    print_capped "git branch" "$branch"
+    printf '\n### git status\n'
+    print_capped "git status" "$status"
+  fi
+
+  if [ "$GIT_DIFF" -eq 1 ]; then
+    # Stream-cap at max+1 bytes so we detect truncation without slurping a huge diff.
+    unstaged="$(git -c color.ui=false diff 2>&1 | head -c "$cap" || true)"
+    staged="$(git -c color.ui=false diff --cached 2>&1 | head -c "$cap" || true)"
+    printf '\n### git diff (working tree)\n'
+    if [ -n "$unstaged" ]; then
+      print_capped "git diff (working tree)" "$unstaged"
+    else
+      printf '(empty)\n'
+    fi
+    printf '\n### git diff --cached (staged)\n'
+    if [ -n "$staged" ]; then
+      print_capped "git diff --cached (staged)" "$staged"
+    else
+      printf '(empty)\n'
+    fi
+  fi
+}
+
+# Assemble an inline question (+ optional context/includes/git) into a query
+# file, mirroring the "## Context / ## Question" structure the plugin produces.
 # Sets QUERY_OUT to the assembled file path.
 build_query_file() {
   # Separate locals + explicit array init for set -u safety (the previous
@@ -228,6 +315,7 @@ build_query_file() {
   local pat=""
   local file=""
   local fence='```'
+  local want_context=0
   local -a files
   files=()  # split decl-then-assign is the portable idiom for bash 3.2 + set -u + arrays in functions (combined local -a foo=() leaves the local uninitialized for ${} expansions on macOS)
 
@@ -246,10 +334,18 @@ build_query_file() {
     done
   fi
 
+  if [ -n "$context" ] || [ "${#files[@]}" -gt 0 ] \
+    || [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]; then
+    want_context=1
+  fi
+
   {
-    if [ -n "$context" ] || [ "${#files[@]}" -gt 0 ]; then
+    if [ "$want_context" -eq 1 ]; then
       printf '## Context\n'
       [ -n "$context" ] && printf '%s\n' "$context"
+      if [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]; then
+        append_git_context
+      fi
       for file in ${files[@]+"${files[@]}"}; do
         printf '\n### %s\n%s\n%s\n%s\n' "$file" "$fence" "$(cat "$file")" "$fence"
       done
@@ -262,7 +358,12 @@ build_query_file() {
 }
 
 have_inline_input() {
-  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
+  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] \
+    || [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]
+}
+
+have_git_flags() {
+  [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]
 }
 
 # run_engine: invoke the engine (bash QUERY_SH ...) under an optional wall-time
@@ -310,15 +411,15 @@ declare -a engine_args
 if [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
   [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
-  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]; then
-    die "--context/--include do not apply to video mode; pass the prompt inline"
+  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] || have_git_flags; then
+    die "--context/--include/--git-status/--diff do not apply to video mode; pass the prompt inline"
   fi
   engine_args=("$VIDEO_SOURCE" "video")
   [ -n "$QUESTION" ] && engine_args+=("$QUESTION")
 elif [ -n "$QUERY_FILE" ]; then
   [ -f "$QUERY_FILE" ] || die "query file not found: $QUERY_FILE"
   if have_inline_input; then
-    die "--query-file cannot be combined with an inline question, --context, or --include"
+    die "--query-file cannot be combined with an inline question, --context, --include, --git-status, or --diff"
   fi
   engine_args=("$QUERY_FILE" "$MODE")
 else
