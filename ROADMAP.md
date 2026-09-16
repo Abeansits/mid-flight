@@ -53,17 +53,19 @@ Same question to two providers, print the disagreement. That is the actual produ
 - Sequential runs; labeled Provider A / Provider B dump; light structural “where they differ” note (no LLM synthesis)
 - If one provider fails, still show the successful answer + the error
 
-### 6. Consult sandbox vs implement sandbox — this PR → v1.13.0
+### 6. Consult sandbox vs implement sandbox — shipped on `main` (v1.13.0, PR #20)
 
 Codex consult (and other non-implement text modes) use `--sandbox read-only`; only implement keeps `workspace-write`.
 
 Evidence that session/scratch still works under read-only: Codex CLI (`codex exec --help`, 0.154.0) documents `--sandbox` as the policy **for model-generated shell commands** only. Host session/rollout persistence is a separate path (`$CODEX_HOME`; `--ephemeral` opts out). Upstream issue openai/codex#42398 likewise states the flag “controls the worker’s tool execution.” The PR #9 deferral worry does not apply.
 
+### 7. Real CLI install — this PR → v1.14.0
+
+`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb` (tap not published; install via `brew install --HEAD --formula ./Formula/midflight.rb` from a checkout). Version still lives in `.claude-plugin/plugin.json`; split that when the CLI is a real distribution.
+
 ## Later
 
-### 7. Real CLI install
-
-`scripts/release.sh publish` already exists. Add a brew formula and/or `curl | bash` so people do not `ln -s` from a git clone. Version still lives in `.claude-plugin/plugin.json`; split that when the CLI is a real distribution.
+_(none queued — next items TBD)_
 
 ## Out of scope unless asked
 

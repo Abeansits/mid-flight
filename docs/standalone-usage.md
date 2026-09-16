@@ -19,7 +19,17 @@ pass and hands it to the engine — it does not call a model to summarize for yo
 ## Install
 
 `bin/midflight` is self-contained and finds the engine relative to its own
-(symlink-resolved) location, so a symlink on your `PATH` works from anywhere:
+(symlink-resolved) location. Prefer the installer (no manual `ln -s`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+midflight --version
+```
+
+From a checkout: `./scripts/install.sh --from-dir . --prefix ~/.local`.
+Homebrew formula sketch (tap not published): `brew install --HEAD --formula ./Formula/midflight.rb`.
+
+Dev symlink still works:
 
 ```bash
 ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight
