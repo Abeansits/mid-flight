@@ -11,6 +11,8 @@ help_output="$(run_cli --help)"
 assert_contains "$help_output" "Usage:" "--help should print usage"
 assert_contains "$help_output" "--provider" "--help should list the provider flag"
 assert_contains "$help_output" "--video" "--help should list the video flag"
+assert_contains "$help_output" "--git-status" "--help should list --git-status"
+assert_contains "$help_output" "--diff" "--help should list --diff"
 
 short_help="$(run_cli -h)"
 assert_eq "$help_output" "$short_help" "-h and --help should print the same help"

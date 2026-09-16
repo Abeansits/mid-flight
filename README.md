@@ -84,6 +84,7 @@ midflight --version
 midflight "should we use SSE or WebSockets for real-time updates?"
 midflight -p agy "is this regex vulnerable to ReDoS?"
 midflight --context notes.md --include "src/*.ts" "where is the leak?"
+midflight --git-status --diff "does this change look right?"
 midflight -m implement -f request.md
 midflight --video ./ad-v3.mp4 "does this match the storyboard?"
 ```
@@ -286,7 +287,7 @@ Config is independent of Claude Code (or any other host), so you can tune MidFli
 ## How it works
 
 1. You (or the host agent) decide a second opinion would help.
-2. A short **context + question** file is written — Claude does this from the session; the CLI uses what you pass (`--context`, `--include`, or a query file).
+2. A short **context + question** file is written — Claude does this from the session; the CLI uses what you pass (`--context`, `--include`, `--git-status`, `--diff`, or a query file).
 3. `scripts/query.sh` wraps that file with a mode prompt and calls the configured provider CLI.
 4. The response comes back on stdout. The host agent presents it next to its own take.
 

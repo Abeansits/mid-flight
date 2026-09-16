@@ -21,17 +21,15 @@ Skills under `hosts/codex/skills/` (`$midflight`, `$midflight-check-config`), en
 
 ### 2b. Grok Build host adapter — shipped on `main` (v1.9.0, PR #15)
 
-Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex. Circular `provider=grok` guard lands with item 3 (this PR). Default `provider=codex` remains a fine external consult from Grok. Install via copy/symlink into `~/.grok/skills/`, project `.grok/skills/`, or `~/.agents/skills/`.
+Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex. Circular `provider=grok` guard shipped with item 3. Default `provider=codex` remains a fine external consult from Grok. Install via copy/symlink into `~/.grok/skills/`, project `.grok/skills/`, or `~/.agents/skills/`.
 
 ### 2c. Cursor host adapter — shipped on `main` (v1.9.0, PR #16)
 
 Skills under `hosts/cursor/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex/Grok. **No** circular guard: `provider=cursor` does not exist yet (waitlisted `agent -p --mode=ask`), so default `provider=codex` is fine from Cursor. Install via copy/symlink into `~/.cursor/skills/`, project `.cursor/skills/`, or `~/.agents/skills/`; path-scoped `npx skills add Abeansits/mid-flight/hosts/cursor/skills --agent cursor` also works (plain repo install is ambiguous vs Codex/Grok skill names).
 
-The planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Standalone CLI Path (a) shipped in PR #7. Path (b) did not: the CLI does not auto-summarize working context.
+The planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Standalone CLI Path (a) shipped in PR #7.
 
-## Next
-
-### 3. First-class provider harnesses — in progress (this PR → v1.10.0)
+### 3. First-class provider harnesses — shipped on `main` (v1.10.0, PR #17)
 
 Complementary *harnesses*, not “another model” (OpenCode can already route to many models):
 
@@ -42,11 +40,13 @@ Complementary *harnesses*, not “another model” (OpenCode can already route t
 
 Waitlist only: Cursor `agent -p --mode=ask`, GitHub Copilot `copilot -p`. Skip Aider / Amp / Crush unless someone asks.
 
+## Next
+
+### 4. Path (b) — CLI context without Claude — this PR → v1.11.0
+
+`midflight --diff` / `--git-status` so the standalone CLI can build a Context section from the repo (capped at 100 KiB per section; override with `MIDFLIGHT_GIT_CONTEXT_MAX_BYTES`). Combinable with `--context` / `-i`. No auto `-i` defaults — include globs stay explicit.
+
 ## Later
-
-### 4. Path (b) — CLI context without Claude
-
-`midflight --diff` / `--git-status` (and maybe `-i` defaults) so the standalone CLI can build a context section from the repo. This is what makes “not just a Claude plugin” true.
 
 ### 5. Dual-consult
 
