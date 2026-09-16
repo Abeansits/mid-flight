@@ -109,6 +109,51 @@ assert_contains "$prompt" "MIDFLIGHT_GIT_CONTEXT_MAX_BYTES" \
 
 echo "PASS: --diff truncates oversized sections with a clear marker"
 
+
+# --- invalid MIDFLIGHT_GIT_CONTEXT_MAX_BYTES must not break plain questions ---
+write_codex_stub "plain-ok"
+output="$(MIDFLIGHT_GIT_CONTEXT_MAX_BYTES=abc run_cli "plain question?")"
+assert_eq "plain-ok" "$output" "typo MAX_BYTES must not break plain midflight \"q?\""
+output="$(MIDFLIGHT_GIT_CONTEXT_MAX_BYTES=0 run_cli "plain question?")"
+assert_eq "plain-ok" "$output" "zero MAX_BYTES must not break plain midflight \"q?\""
+
+# Same env with git flags should still fail clearly
+pushd "$REPO" >/dev/null
+set +e
+err="$(MIDFLIGHT_GIT_CONTEXT_MAX_BYTES=abc run_cli --git-status "x?" 2>&1)"
+ec=$?
+set -e
+popd >/dev/null
+assert_eq "2" "$ec" "invalid MAX_BYTES with --git-status should exit 2"
+assert_contains "$err" "invalid MIDFLIGHT_GIT_CONTEXT_MAX_BYTES" \
+  "should name the bad env when git flags are used"
+
+echo "PASS: MAX_BYTES only validated when git flags are used"
+
+# --- git flags alone require a QUESTION ---
+write_codex_stub "should-not-run-git-alone"
+pushd "$REPO" >/dev/null
+set +e
+err_alone="$(run_cli --git-status 2>&1)"
+ec_alone=$?
+err_diff_alone="$(run_cli --diff 2>&1)"
+ec_diff_alone=$?
+err_both="$(run_cli --git-status --diff 2>&1)"
+ec_both=$?
+set -e
+popd >/dev/null
+assert_eq "2" "$ec_alone" "--git-status alone should exit 2"
+assert_contains "$err_alone" "require a QUESTION" \
+  "--git-status alone should demand a QUESTION"
+assert_eq "2" "$ec_diff_alone" "--diff alone should exit 2"
+assert_contains "$err_diff_alone" "require a QUESTION" \
+  "--diff alone should demand a QUESTION"
+assert_eq "2" "$ec_both" "--git-status --diff alone should exit 2"
+assert_contains "$err_both" "require a QUESTION" \
+  "git flags without QUESTION should be rejected"
+
+echo "PASS: git flags alone require a QUESTION"
+
 # --- help lists the new flags ---
 help_output="$(run_cli --help)"
 assert_contains "$help_output" "--git-status" "--help should list --git-status"

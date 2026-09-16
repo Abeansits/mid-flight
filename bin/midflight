@@ -137,8 +137,12 @@ if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
 fi
 [ "${TIMEOUT:-120}" -le 0 ] && TIMEOUT=0  # 0 = no timeout bound (user override)
 
-if ! [[ "$GIT_CONTEXT_MAX_BYTES" =~ ^[0-9]+$ ]] || [ "$GIT_CONTEXT_MAX_BYTES" -le 0 ]; then
-  die "invalid MIDFLIGHT_GIT_CONTEXT_MAX_BYTES '$GIT_CONTEXT_MAX_BYTES' (positive integer bytes expected)"
+# Only enforce the cap env when git context is actually requested — a typo/0/abc
+# in MIDFLIGHT_GIT_CONTEXT_MAX_BYTES must not break plain `midflight "q?"`.
+if [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]; then
+  if ! [[ "$GIT_CONTEXT_MAX_BYTES" =~ ^[0-9]+$ ]] || [ "$GIT_CONTEXT_MAX_BYTES" -le 0 ]; then
+    die "invalid MIDFLIGHT_GIT_CONTEXT_MAX_BYTES '$GIT_CONTEXT_MAX_BYTES' (positive integer bytes expected)"
+  fi
 fi
 
 QUESTION="${POSITIONAL[*]:-}"
@@ -358,8 +362,9 @@ build_query_file() {
 }
 
 have_inline_input() {
-  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] \
-    || [ "$GIT_STATUS" -eq 1 ] || [ "$GIT_DIFF" -eq 1 ]
+  # Git flags alone are not enough — they decorate Context but still need a QUESTION
+  # (or --query-file / --video). See the require-QUESTION check below.
+  [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
 }
 
 have_git_flags() {
@@ -418,11 +423,14 @@ if [ "$MODE" = "video" ]; then
   [ -n "$QUESTION" ] && engine_args+=("$QUESTION")
 elif [ -n "$QUERY_FILE" ]; then
   [ -f "$QUERY_FILE" ] || die "query file not found: $QUERY_FILE"
-  if have_inline_input; then
+  if have_inline_input || have_git_flags; then
     die "--query-file cannot be combined with an inline question, --context, --include, --git-status, or --diff"
   fi
   engine_args=("$QUERY_FILE" "$MODE")
 else
+  if have_git_flags && [ -z "$QUESTION" ]; then
+    die "--git-status/--diff require a QUESTION (or use --query-file/--video)"
+  fi
   have_inline_input || die "no question provided (give a QUESTION, --query-file, or --video)"
   QUERY_OUT=""
   build_query_file

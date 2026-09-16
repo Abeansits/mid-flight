@@ -92,6 +92,9 @@ midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
 midflight --context recent-debug.md --include "src/**/*.ts" \
   "why does the worker hang on shutdown?"
 
+# Repo-derived Context (branch/status and/or working-tree + staged diffs)
+midflight --git-status --diff "does this change look right?"
+
 # Repeatable --include
 midflight -i "src/auth/*.ts" -i "README.md" "is the token TTL sane?"
 
