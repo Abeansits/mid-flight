@@ -44,7 +44,9 @@ midflight [OPTIONS] [QUESTION...]
 
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
-      --model MODEL      model to use for the active provider (overrides config)
+      --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
+      --providers A,B    dual-consult with both providers named explicitly (consult-only)
+      --model MODEL      model to use for the active provider (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
@@ -57,6 +59,31 @@ midflight [OPTIONS] [QUESTION...]
   -h, --help             show help
   -V, --version          show version
 ```
+
+### Dual-consult
+
+Same question to two providers; print both answers. That is the product.
+
+Primary UX:
+
+```bash
+midflight --dual agy "should we use SSE or WebSockets?"
+midflight -p codex --dual grok "should we use SSE or WebSockets?"
+```
+
+Explicit form (names both sides):
+
+```bash
+midflight --providers codex,agy "should we use SSE or WebSockets?"
+```
+
+Rules for v1:
+
+- **Consult-only** — `--dual` / `--providers` refuse `implement` and `video` with a clear usage error.
+- Sequential engine runs (same assembled query file / `--query-file`).
+- Stdout is a labeled dump (`## Provider A` / `## Provider B`) plus a short `## Where they differ` note that is structural only (identical-after-trim, or “compare them yourself”). MidFlight does **not** invent a merged opinion or LLM disagreement analysis.
+- If one provider fails, the successful answer is still printed and the failed side shows its error; exit status is `1`.
+- `--model` is not combined with dual (set per-provider models in config). `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
 
 ### Git-derived context
 
@@ -84,6 +111,10 @@ midflight "should we use SSE or WebSockets for real-time updates?"
 
 # Override the provider for a single call
 midflight -p agy "is this regex vulnerable to ReDoS?"
+
+# Dual-consult (same question → two providers)
+midflight --dual agy "SSE or WebSockets?"
+midflight --providers codex,agy "SSE or WebSockets?"
 
 # Override both provider and model
 midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
@@ -141,7 +172,10 @@ Your `~/.config/mid-flight/config` is never modified.
 
 - `0` — success (provider response on stdout; `[mid-flight]` logs on stderr).
 - `2` — usage error (bad mode, missing question, conflicting flags, missing
-  files passed to `--context`/`--config`/`--query-file`, or `--git-status`/`--diff`
-  used outside a git work tree / without `git` on PATH).
+  files passed to `--context`/`--config`/`--query-file`, dual-consult misuse
+  (implement/video, same provider twice, `--dual`+`--providers`, `--model` with
+  dual), or `--git-status`/`--diff` used outside a git work tree / without `git`
+  on PATH).
 - `1` — engine/provider error (missing provider CLI, invalid config, auth or
-  network failure). These messages come straight from the engine.
+  network failure), including dual-consult when either side fails (successful
+  side still printed). Single-provider messages come straight from the engine.

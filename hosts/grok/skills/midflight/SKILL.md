@@ -105,6 +105,18 @@ If resolution fails, tell the user to install the standalone CLI (`ln -s …/bin
    - New concerns you hadn't considered
    - For video: most actionable feedback and quality issues
 
+
+## Dual-consult (via CLI)
+
+Same question to two providers — print both answers. Prefer the standalone CLI:
+
+```bash
+midflight --dual agy "should we use SSE or WebSockets?"
+# or explicit: midflight --providers codex,agy "…"
+```
+
+Consult-only in v1. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
+
 ## When to self-invoke
 
 Consider invoking `/midflight` yourself when:

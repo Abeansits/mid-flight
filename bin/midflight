@@ -52,7 +52,9 @@ Usage:
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
-      --model MODEL      model to use for the active provider (overrides config)
+      --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
+      --providers A,B    dual-consult with both providers named explicitly (consult-only)
+      --model MODEL      model to use for the active provider (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
@@ -66,6 +68,12 @@ Options:
   -h, --help             show this help
   -V, --version          show version
 
+Dual-consult (--dual / --providers): same question to two providers, print both
+answers and a light structural note. Consult-only in v1 (refuse implement/video).
+Primary UX: midflight --dual agy "…" (primary from config or -p). Explicit form:
+midflight --providers codex,agy "…". Sequential; if one fails, the other is still
+shown. MidFlight does not synthesize a merged opinion.
+
 Git context (--git-status / --diff) is capped at 100 KiB (102400 bytes) per
 section. Raise via MIDFLIGHT_GIT_CONTEXT_MAX_BYTES. Requires a git repo and git
 on PATH. Combinable with --context / -i / an inline question.
@@ -73,6 +81,9 @@ on PATH. Combinable with --context / -i / an inline question.
 Examples:
   midflight "should we use SSE or WebSockets here?"
   midflight -p agy "is this regex safe against ReDoS?"
+  midflight --dual agy "SSE or WebSockets?"
+  midflight -p codex --dual grok "SSE or WebSockets?"
+  midflight --providers codex,agy "SSE or WebSockets?"
   midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
   midflight --context notes.md -i "src/*.ts" "where is the leak?"
   midflight --git-status --diff "does this change look right?"
@@ -91,6 +102,8 @@ declare -a INCLUDES=()
 declare -a POSITIONAL=()
 MODE=""
 PROVIDER=""
+DUAL_PROVIDER=""
+PROVIDERS_LIST=""
 MODEL=""
 CONFIG_FILE=""
 QUERY_FILE=""
@@ -106,6 +119,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -m|--mode)       MODE="${2:-}"; shift 2 ;;
     -p|--provider)   PROVIDER="${2:-}"; shift 2 ;;
+    --dual)          DUAL_PROVIDER="${2:-}"; shift 2 ;;
+    --providers)     PROVIDERS_LIST="${2:-}"; shift 2 ;;
     --model)         MODEL="${2:-}"; shift 2 ;;
     -c|--config)     CONFIG_FILE="${2:-}"; shift 2 ;;
     -f|--query-file) QUERY_FILE="${2:-}"; shift 2 ;;
@@ -131,6 +146,111 @@ case "$MODE" in
   consult|implement|video) ;;
   *) die "invalid mode '$MODE' (expected consult, implement, or video)" ;;
 esac
+
+normalize_provider_name() {
+  case "$1" in
+    antigravity) printf '%s\n' "agy" ;;
+    grok-build)  printf '%s\n' "grok" ;;
+    *)           printf '%s\n' "$1" ;;
+  esac
+}
+
+provider_label() {
+  case "$1" in
+    codex) printf '%s\n' "Codex" ;;
+    gemini) printf '%s\n' "Gemini" ;;
+    agy) printf '%s\n' "Antigravity" ;;
+    opencode) printf '%s\n' "OpenCode" ;;
+    oz) printf '%s\n' "Oz" ;;
+    grok) printf '%s\n' "Grok" ;;
+    claude) printf '%s\n' "Claude" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+require_known_provider() {
+  local name="$1" flag="$2"
+  case "$name" in
+    codex|gemini|agy|opencode|oz|grok|claude) ;;
+    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, or claude)" ;;
+  esac
+}
+
+# Dual-consult: same question to two providers. Consult-only in v1.
+want_dual=0
+if [ -n "$DUAL_PROVIDER" ] || [ -n "$PROVIDERS_LIST" ]; then
+  want_dual=1
+fi
+
+if [ "$want_dual" -eq 1 ]; then
+  if [ "$MODE" != "consult" ]; then
+    die "dual-consult is consult-only in v1 (refusing mode='$MODE'; omit --dual/--providers or use -m consult)"
+  fi
+  if [ -n "$VIDEO_SOURCE" ]; then
+    die "dual-consult cannot be combined with --video"
+  fi
+  if [ -n "$DUAL_PROVIDER" ] && [ -n "$PROVIDERS_LIST" ]; then
+    die "use either --dual or --providers, not both"
+  fi
+  if [ -n "$MODEL" ]; then
+    die "--model cannot be combined with dual-consult; set per-provider models in ~/.config/mid-flight/config"
+  fi
+  if [ -z "$DUAL_PROVIDER" ] && [ -z "$PROVIDERS_LIST" ]; then
+    die "dual-consult requires --dual PROVIDER or --providers A,B"
+  fi
+fi
+
+PRIMARY_PROVIDER=""
+SECONDARY_PROVIDER=""
+
+resolve_dual_providers() {
+  local raw_a="" raw_b="" cfg_provider=""
+  if [ -n "$PROVIDERS_LIST" ]; then
+    if [ -n "$PROVIDER" ]; then
+      die "--providers names both providers; do not also pass -p/--provider"
+    fi
+    case "$PROVIDERS_LIST" in
+      *,*,*) die "--providers expects exactly two names as A,B (got '$PROVIDERS_LIST')" ;;
+      *,*) ;;
+      *) die "--providers expects exactly two names as A,B (got '$PROVIDERS_LIST')" ;;
+    esac
+    raw_a="${PROVIDERS_LIST%%,*}"
+    raw_b="${PROVIDERS_LIST#*,}"
+    raw_a="$(printf '%s' "$raw_a" | tr -d '[:space:]')"
+    raw_b="$(printf '%s' "$raw_b" | tr -d '[:space:]')"
+    [ -n "$raw_a" ] || die "--providers left side is empty"
+    [ -n "$raw_b" ] || die "--providers right side is empty"
+    PRIMARY_PROVIDER="$(normalize_provider_name "$raw_a")"
+    SECONDARY_PROVIDER="$(normalize_provider_name "$raw_b")"
+    require_known_provider "$PRIMARY_PROVIDER" "--providers"
+    require_known_provider "$SECONDARY_PROVIDER" "--providers"
+  else
+    [ -n "$DUAL_PROVIDER" ] || die "dual-consult requires --dual PROVIDER"
+    SECONDARY_PROVIDER="$(normalize_provider_name "$(printf '%s' "$DUAL_PROVIDER" | tr -d '[:space:]')")"
+    [ -n "$SECONDARY_PROVIDER" ] || die "--dual requires a provider name"
+    require_known_provider "$SECONDARY_PROVIDER" "--dual"
+    if [ -n "$PROVIDER" ]; then
+      PRIMARY_PROVIDER="$(normalize_provider_name "$PROVIDER")"
+      require_known_provider "$PRIMARY_PROVIDER" "-p/--provider"
+    else
+      if [ -n "$CONFIG_FILE" ]; then
+        [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
+        cfg_provider="$(grep '^provider=' "$CONFIG_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+      elif [ -f "$HOME/.config/mid-flight/config" ]; then
+        cfg_provider="$(grep '^provider=' "$HOME/.config/mid-flight/config" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+      fi
+      if [ -n "$cfg_provider" ]; then
+        PRIMARY_PROVIDER="$(normalize_provider_name "$cfg_provider")"
+        require_known_provider "$PRIMARY_PROVIDER" "config provider"
+      else
+        PRIMARY_PROVIDER="codex"
+      fi
+    fi
+  fi
+  if [ "$PRIMARY_PROVIDER" = "$SECONDARY_PROVIDER" ]; then
+    die "dual-consult needs two different providers (both are '$PRIMARY_PROVIDER')"
+  fi
+}
 
 if [ -n "$TIMEOUT" ] && ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
   die "invalid --timeout '$TIMEOUT' (non-negative integer seconds expected; 0 disables the bound)"
@@ -435,6 +555,88 @@ else
   QUERY_OUT=""
   build_query_file
   engine_args=("$QUERY_OUT" "$MODE")
+fi
+
+# Capture one engine run's stdout/stderr/exit for dual-consult formatting.
+run_engine_capture() {
+  local out_file="$1" err_file="$2" ec_file="$3"
+  shift 3
+  set +e
+  run_engine "$@" >"$out_file" 2>"$err_file"
+  printf '%s' "$?" >"$ec_file"
+  set -e
+}
+
+print_dual_report() {
+  local label_a="$1" name_a="$2" status_a="$3" body_a="$4"
+  local label_b="$5" name_b="$6" status_b="$7" body_b="$8"
+  local trimmed_a trimmed_b
+
+  printf '## %s: %s\n\n' "$label_a" "$name_a"
+  printf '%s\n\n' "$body_a"
+  printf '## %s: %s\n\n' "$label_b" "$name_b"
+  printf '%s\n\n' "$body_b"
+  printf '## Where they differ\n\n'
+  if [ "$status_a" -ne 0 ] && [ "$status_b" -ne 0 ]; then
+    printf 'Both providers failed; no answers to compare.\n'
+  elif [ "$status_a" -ne 0 ]; then
+    printf "%s failed; only %s's answer is available above.\n" "$name_a" "$name_b"
+  elif [ "$status_b" -ne 0 ]; then
+    printf "%s failed; only %s's answer is available above.\n" "$name_b" "$name_a"
+  else
+    trimmed_a="$(printf '%s' "$body_a" | sed -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//')"
+    trimmed_b="$(printf '%s' "$body_b" | sed -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//')"
+    if [ "$trimmed_a" = "$trimmed_b" ]; then
+      printf 'Responses are identical (after trim). MidFlight does not synthesize a merged opinion.\n'
+    else
+      printf 'Both answers are printed above. Compare them directly — MidFlight does not invent a disagreement analysis.\n'
+    fi
+  fi
+}
+
+if [ "$want_dual" -eq 1 ]; then
+  resolve_dual_providers
+
+  out_a="$WORKDIR/dual_a.out"
+  err_a="$WORKDIR/dual_a.err"
+  ec_a_file="$WORKDIR/dual_a.ec"
+  out_b="$WORKDIR/dual_b.out"
+  err_b="$WORKDIR/dual_b.err"
+  ec_b_file="$WORKDIR/dual_b.ec"
+
+  # Primary
+  PROVIDER="$PRIMARY_PROVIDER"
+  CONFIG_HOME=""
+  build_config_home
+  run_engine_capture "$out_a" "$err_a" "$ec_a_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  # Secondary
+  PROVIDER="$SECONDARY_PROVIDER"
+  CONFIG_HOME=""
+  build_config_home
+  run_engine_capture "$out_b" "$err_b" "$ec_b_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+
+  # Keep provider logs on stderr (prefixed) so dual stdout stays the product.
+  if [ -s "$err_a" ]; then
+    sed "s/^/[$(provider_label "$PRIMARY_PROVIDER")] /" "$err_a" >&2 || true
+  fi
+  if [ -s "$err_b" ]; then
+    sed "s/^/[$(provider_label "$SECONDARY_PROVIDER")] /" "$err_b" >&2 || true
+  fi
+
+  status_a="$(cat "$ec_a_file")"
+  status_b="$(cat "$ec_b_file")"
+  body_a="$(cat "$out_a")"
+  body_b="$(cat "$out_b")"
+  # Trim a single trailing newline for cleaner section bodies (printf adds one).
+  body_a="${body_a%"${body_a##*[![:space:]]}"}"
+  body_b="${body_b%"${body_b##*[![:space:]]}"}"
+
+  print_dual_report     "Provider A" "$(provider_label "$PRIMARY_PROVIDER")" "$status_a" "$body_a"     "Provider B" "$(provider_label "$SECONDARY_PROVIDER")" "$status_b" "$body_b"
+
+  if [ "$status_a" -eq 0 ] && [ "$status_b" -eq 0 ]; then
+    exit 0
+  fi
+  exit 1
 fi
 
 if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then

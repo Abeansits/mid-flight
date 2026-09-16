@@ -83,6 +83,8 @@ midflight --version
 ```bash
 midflight "should we use SSE or WebSockets for real-time updates?"
 midflight -p agy "is this regex vulnerable to ReDoS?"
+midflight --dual agy "SSE or WebSockets?"
+midflight --providers codex,agy "SSE or WebSockets?"
 midflight --context notes.md --include "src/*.ts" "where is the leak?"
 midflight --git-status --diff "does this change look right?"
 midflight -m implement -f request.md

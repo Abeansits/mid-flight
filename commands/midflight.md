@@ -14,6 +14,18 @@ Supports text consultation, implementation delegation, and **video analysis** (s
 
 **Circular warning:** `provider=claude` from Claude Code is circular (same harness). Prefer `codex`, `agy`, `opencode`, `oz`, `gemini`, or `grok` in `~/.config/mid-flight/config` (or pass another provider via the CLI when using `midflight -p`). Do not set `provider=claude` as the MidFlight default while hosting from Claude Code unless you deliberately want a same-CLI second pass.
 
+
+## Dual-consult (via CLI)
+
+Same question to two providers — print both answers. Prefer the standalone CLI:
+
+```bash
+midflight --dual agy "should we use SSE or WebSockets?"
+# or explicit: midflight --providers codex,agy "…"
+```
+
+Consult-only in v1. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
+
 ## Your job
 
 1. **Assess the situation** — What are we working on? What's the current state? What specific problem or question needs outside perspective?

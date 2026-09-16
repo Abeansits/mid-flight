@@ -40,17 +40,20 @@ Complementary *harnesses*, not “another model” (OpenCode can already route t
 
 Waitlist only: Cursor `agent -p --mode=ask`, GitHub Copilot `copilot -p`. Skip Aider / Amp / Crush unless someone asks.
 
-## Next
-
-### 4. Path (b) — CLI context without Claude — this PR → v1.11.0
+### 4. Path (b) — CLI context without Claude — shipped on `main` (v1.11.0, PR #18)
 
 `midflight --diff` / `--git-status` so the standalone CLI can build a Context section from the repo (capped at 100 KiB per section; override with `MIDFLIGHT_GIT_CONTEXT_MAX_BYTES`). Combinable with `--context` / `-i`. No auto `-i` defaults — include globs stay explicit.
 
-## Later
-
-### 5. Dual-consult
+### 5. Dual-consult — this PR → v1.12.0
 
 Same question to two providers, print the disagreement. That is the actual product, not “we support 8 CLIs.”
+
+- CLI: `midflight --dual agy "…"` (primary from config/`-p`) or `midflight --providers codex,agy "…"`
+- Consult-only in v1 (refuse implement/video dual)
+- Sequential runs; labeled Provider A / Provider B dump; light structural “where they differ” note (no LLM synthesis)
+- If one provider fails, still show the successful answer + the error
+
+## Later
 
 ### 6. Consult sandbox vs implement sandbox
 
