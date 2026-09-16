@@ -114,15 +114,33 @@ esac
 out="$(env -u REF -u MIDFLIGHT_REF bash "$INSTALL_SH" --ref 1.9.0 --dry-run 2>&1)"
 assert_contains "$out" "would download ref v1.9.0" "bare 1.9.0 should normalize to v1.9.0"
 
-# --- dry-run must not mkdir real ~/.local (HOME is test sandbox) ---
+# --- default PREFIX follows default_prefix policy; dry-run must not mkdir ---
+# Policy (scripts/install.sh): writable /usr/local (or /usr/local/bin) wins,
+# else $HOME/.local. GHA runners often have writable /usr/local; local/dev
+# sandboxes often do not — assert whichever install.sh would choose here.
 [ ! -e "$HOME/.local" ] || {
   # If something else created it earlier in this test file, remove and re-check.
   rm -rf "$HOME/.local"
 }
+expected_prefix=""
+if [ -w /usr/local/bin ] 2>/dev/null || [ -w /usr/local ] 2>/dev/null; then
+  expected_prefix="/usr/local"
+else
+  expected_prefix="$HOME/.local"
+fi
 out="$(env -u REF -u MIDFLIGHT_REF -u PREFIX bash "$INSTALL_SH" --dry-run 2>&1)"
-assert_contains "$out" "PREFIX=$HOME/.local" "dry-run default prefix should be ~/.local under test HOME"
+assert_contains "$out" "PREFIX=$expected_prefix" \
+  "dry-run default prefix should match default_prefix ($expected_prefix)"
 [ ! -e "$HOME/.local" ] || {
   echo "FAIL: dry-run created $HOME/.local" >&2
+  exit 1
+}
+
+# Explicit PREFIX still wins over /usr/local writability.
+out="$(env -u REF -u MIDFLIGHT_REF PREFIX="$HOME/.local" bash "$INSTALL_SH" --dry-run 2>&1)"
+assert_contains "$out" "PREFIX=$HOME/.local" "PREFIX env should override default_prefix"
+[ ! -e "$HOME/.local" ] || {
+  echo "FAIL: dry-run with PREFIX=$HOME/.local created $HOME/.local" >&2
   exit 1
 }
 
