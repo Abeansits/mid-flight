@@ -43,7 +43,7 @@ while [ \$# -gt 0 ]; do
 done
 
 printf '%s' "\$prompt" > "$TEST_DIR/codex_prompt.txt"
-printf 'consult-ok\n' > "\$output_file"
+printf 'implement-ok\n' > "\$output_file"
 EOF
 
 chmod +x "$TEST_DIR/bin/codex"
@@ -51,36 +51,33 @@ chmod +x "$TEST_DIR/bin/codex"
 QUERY_FILE="$(
   write_query_file <<'EOF'
 ## Context
-We are refactoring MidFlight.
+Implement-mode sandbox check.
 
 ## Question
-Should we extract prompt files?
+Add a retry wrapper to fetchUser().
 EOF
 )"
 
-output="$(run_query "$QUERY_FILE" consult)"
+output="$(run_query "$QUERY_FILE" implement)"
 
-assert_eq "consult-ok" "$output" "consult query should return stubbed codex output"
+assert_eq "implement-ok" "$output" "implement query should return stubbed codex output"
 assert_contains "$(cat "$TEST_DIR/codex_prompt.txt")" \
-  "You are a senior engineer being consulted mid-development." \
-  "consult prompt should include the consult system prompt"
+  "implementation" \
+  "implement prompt should include the implement system prompt"
 assert_contains "$(cat "$TEST_DIR/codex_prompt.txt")" \
-  "Should we extract prompt files?" \
-  "consult prompt should include the query body"
+  "Add a retry wrapper to fetchUser()" \
+  "implement prompt should include the query body"
 
-# Consult must stay least-privilege. `--sandbox` only gates model-generated
-# shell/tool writes (not host $CODEX_HOME session files). Implement uses
-# workspace-write separately — see query_codex_implement.sh.
 CODEX_ARGS="$(cat "$TEST_DIR/codex_args.txt")"
 
-# One arg per line, so adjacent lines assert `--sandbox read-only` as a pair:
-# workspace-write, or the value merely appearing elsewhere in argv, must fail.
-assert_contains "$CODEX_ARGS" $'--sandbox\nread-only' \
-  "consult codex sandbox mode should be read-only"
+# One arg per line, so adjacent lines assert `--sandbox workspace-write` as a pair:
+# read-only, or the value merely appearing elsewhere in argv, must fail.
+assert_contains "$CODEX_ARGS" $'--sandbox\nworkspace-write' \
+  "implement codex sandbox mode should be workspace-write"
 
 if [[ "$CODEX_ARGS" == *"--full-auto"* ]]; then
   echo "FAIL: codex invocation must not pass --full-auto (removed in codex-cli 0.147.0)" >&2
   exit 1
 fi
 
-echo "PASS: consult mode routes through codex with the expected prompt and sandbox flags"
+echo "PASS: implement mode routes through codex with workspace-write sandbox"

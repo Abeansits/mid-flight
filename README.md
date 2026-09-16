@@ -362,6 +362,8 @@ MidFlight is a thin router over other agents' CLIs.
 
 Each invocation gets its own temp run workspace for staged inputs, prompt assembly, provider logs, and response capture. Stdin is detached before launching provider CLIs so a caller with an open pipe cannot deadlock Codex.
 
+Codex sandbox is mode-scoped: consult/video use `--sandbox read-only`; implement uses `--sandbox workspace-write` so edits can land. The sandbox only restricts model-generated shell/tool writes — Codex still persists its own session state under `$CODEX_HOME`.
+
 Video mode copies local files into a staging dir. Gemini gets `@path` plus `--include-directories`. Antigravity gets `--add-dir` and a plain path in the prompt (no `@path` syntax). URLs go in the prompt as-is. Gemini's 20MB inline-file limit is checked up front.
 
 </details>

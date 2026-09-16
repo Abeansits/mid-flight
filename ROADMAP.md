@@ -44,7 +44,7 @@ Waitlist only: Cursor `agent -p --mode=ask`, GitHub Copilot `copilot -p`. Skip A
 
 `midflight --diff` / `--git-status` so the standalone CLI can build a Context section from the repo (capped at 100 KiB per section; override with `MIDFLIGHT_GIT_CONTEXT_MAX_BYTES`). Combinable with `--context` / `-i`. No auto `-i` defaults — include globs stay explicit.
 
-### 5. Dual-consult — this PR → v1.12.0
+### 5. Dual-consult — shipped on `main` (v1.12.0, PR #19)
 
 Same question to two providers, print the disagreement. That is the actual product, not “we support 8 CLIs.”
 
@@ -53,11 +53,13 @@ Same question to two providers, print the disagreement. That is the actual produ
 - Sequential runs; labeled Provider A / Provider B dump; light structural “where they differ” note (no LLM synthesis)
 - If one provider fails, still show the successful answer + the error
 
+### 6. Consult sandbox vs implement sandbox — this PR → v1.13.0
+
+Codex consult (and other non-implement text modes) use `--sandbox read-only`; only implement keeps `workspace-write`.
+
+Evidence that session/scratch still works under read-only: Codex CLI (`codex exec --help`, 0.154.0) documents `--sandbox` as the policy **for model-generated shell commands** only. Host session/rollout persistence is a separate path (`$CODEX_HOME`; `--ephemeral` opts out). Upstream issue openai/codex#42398 likewise states the flag “controls the worker’s tool execution.” The PR #9 deferral worry does not apply.
+
 ## Later
-
-### 6. Consult sandbox vs implement sandbox
-
-Codex consult should be `--sandbox read-only`. Only implement needs `workspace-write`. Verify Codex still writes its own session/scratch state under read-only before switching — that is why it was deferred in PR #9.
 
 ### 7. Real CLI install
 
