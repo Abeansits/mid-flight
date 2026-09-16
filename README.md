@@ -75,6 +75,39 @@ Claude already has the session, so it writes the context summary for you. It can
 
 Same engine, no Claude Code required. Use it from a terminal, a script, or CI. You supply the question (and optionally the context).
 
+**Install (recommended)** — puts `midflight` on your `PATH` without a manual `ln -s` from a clone. The one-liner installs from **`main`** (repo tip):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+midflight --version
+```
+
+Published GitHub releases may lag plugin metadata on `main`. Pin a release tag only when you want that exact tree (install script + matching source tarball):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/vX.Y.Z/scripts/install.sh | bash -s -- --ref vX.Y.Z
+```
+
+Defaults: source ref is `main`; install prefix is `/usr/local` when writable, otherwise `~/.local`. Override with `PREFIX=…` / `--prefix`, or `REF=…` / `--ref`. Packaging can set `DESTDIR`.
+
+From a checkout (offline / local):
+
+```bash
+./scripts/install.sh --from-dir . --prefix ~/.local
+```
+
+**Homebrew (formula in-repo; tap not published yet):**
+
+```bash
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
+brew install --HEAD --formula ./Formula/midflight.rb
+```
+
+Do not use `brew tap Abeansits/mid-flight` until that tap exists. A stable `url`/`sha256` will be added to `Formula/midflight.rb` when a matching GitHub release is published.
+
+**Dev symlink** (still fine if you are hacking on a clone):
+
 ```bash
 ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight
 midflight --version
@@ -101,9 +134,9 @@ Same engine, for [Codex](https://developers.openai.com/codex/skills) (`$midfligh
 **Engine first** (the skills call it):
 
 ```bash
-git clone https://github.com/Abeansits/mid-flight.git
-cd mid-flight
-ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
+# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
 ```
 
 **Then install the skills** (pick one):
@@ -140,9 +173,9 @@ Same engine, for [Grok Build](https://docs.x.ai/build/features/skills-plugins-ma
 **Engine first** (the skills call it):
 
 ```bash
-git clone https://github.com/Abeansits/mid-flight.git
-cd mid-flight
-ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
+# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
 ```
 
 **Then install the skills** (copy or symlink — prefer this over marketplace publish):
@@ -182,9 +215,9 @@ Same engine, for [Cursor](https://cursor.com/docs/skills) (`/midflight` Agent Sk
 **Engine first** (the skills call it):
 
 ```bash
-git clone https://github.com/Abeansits/mid-flight.git
-cd mid-flight
-ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight   # or set MIDFLIGHT_ROOT=$(pwd)
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
+# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
 ```
 
 **Then install the skills** (copy or symlink — recommended):
