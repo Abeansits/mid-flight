@@ -143,9 +143,9 @@ ln -s "$(pwd)/hosts/cursor/skills/midflight" ~/.cursor/skills/midflight
 
 | Host | Directory | Target |
 |---|---|---|
-| `hosts/grok-bot/` | Cursor's Grok Bot assistants | Sand-workflow skills |
+| `hosts/grok-bot/` | Cursor Grok Bot (desktop assistant) | Agent Skills |
 | `hosts/cursor/` | Cursor agents (general) | Agent Skills |
-| `hosts/grok/` | xAI's Grok Build CLI | Grok Build skills (separate from Grok Bot) |
+| `hosts/grok/` | xAI's Grok Build CLI | Grok Build skills |
 | `hosts/codex/` | OpenAI Codex CLI | Codex agent skills |
 
 All use the same shared engine (`bin/midflight` / `scripts/query.sh`).

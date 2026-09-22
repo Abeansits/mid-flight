@@ -14,17 +14,17 @@ if [ -n "$HOST_SCRIPTS" ] && [ -f "$HOST_SCRIPTS/run-check-config.sh" ]; then
 fi
 
 # Standalone skill install: only PATH / MIDFLIGHT_ROOT remain.
-if [ -z "${MIDFLIGHT_ROOT:-}" ] && ! command -v midflight >/dev/null 2>&1; then
-  printf 'midflight-check-config: engine not found. Put midflight on PATH or set MIDFLIGHT_ROOT.\n' >&2
-  exit 1
-fi
-
-# Resolve check-config.sh
 if command -v midflight >/dev/null 2>&1; then
-  mf="$(command -v midflight)"
-  repo_root="$(dirname "$(dirname "$mf")")"
-  if [ -f "$repo_root/scripts/check-config.sh" ]; then
-    exec bash "$repo_root/scripts/check-config.sh"
+  mf_bin="$(command -v midflight)"
+  source="$mf_bin"
+  while [ -L "$source" ]; do
+    dir="$(cd -P "$(dirname "$source")" && pwd)"
+    source="$(readlink "$source")"
+    [[ "$source" != /* ]] && source="$dir/$source"
+  done
+  root="$(cd -P "$(dirname "$source")/.." && pwd)"
+  if [ -f "$root/scripts/check-config.sh" ]; then
+    exec bash "$root/scripts/check-config.sh"
   fi
 fi
 
@@ -32,5 +32,5 @@ if [ -n "${MIDFLIGHT_ROOT:-}" ] && [ -f "$MIDFLIGHT_ROOT/scripts/check-config.sh
   exec bash "$MIDFLIGHT_ROOT/scripts/check-config.sh"
 fi
 
-printf 'midflight-check-config: check-config.sh not found\n' >&2
+printf 'midflight-check-config: engine not found. Put midflight on PATH or set MIDFLIGHT_ROOT.\n' >&2
 exit 1

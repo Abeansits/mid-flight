@@ -1,8 +1,6 @@
 # Grok Bot host adapter
 
-Agent Skills for **Cursor's Grok Bot** that invoke the shared MidFlight engine.
-
-**Important:** This is for **Cursor Grok Bot** assistants (sand-workflow skills), NOT xAI's Grok Build CLI. For Grok Build, see `hosts/grok/`.
+Agent Skills for Cursor Grok Bot (desktop assistant). For xAI's Grok Build CLI, see `hosts/grok/`.
 
 | Skill | Invoke | Role |
 |---|---|---|
