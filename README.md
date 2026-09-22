@@ -42,57 +42,82 @@ You don't pick the mode. MidFlight infers it from the question. Uncertain → co
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
-## Install for Grok Bot / Cursor (portable skill)
+## Install for Grok Bot / Cursor
 
-**TL;DR:** Root-level skill at `skills/mid-flight/SKILL.md` works with Grok Bot and Cursor agents. Provider CLIs handle the heavy lifting when available; graceful handoffs when not.
+**Real host adapters** for Cursor's Grok Bot and Cursor agents. These wire the shared MidFlight engine so `/midflight` actually works.
+
+**Important:** "Grok Bot" = Cursor's Grok Bot assistants. For xAI's Grok Build CLI, see [§4. Grok Build skills](#4-grok-build-skills).
 
 ### Quick start
 
-**1. Add the skill to your agent:**
-
-For Grok Bot / Cursor Cloud Agents, copy or link the skill into your workspace or user skill directory:
-
-```bash
-# Project-local (travels with the repo)
-mkdir -p .cursor/skills
-cp -R skills/mid-flight .cursor/skills/mid-flight
-# or symlink: ln -s "$(pwd)/skills/mid-flight" .cursor/skills/mid-flight
-
-# User-wide (Cursor syncs to Cloud Agents)
-mkdir -p ~/.cursor/skills
-cp -R skills/mid-flight ~/.cursor/skills/mid-flight
-
-# Grok Bot user-wide
-mkdir -p ~/.grok/skills
-cp -R skills/mid-flight ~/.grok/skills/mid-flight
-```
-
-**2. Install the engine** (puts `midflight` on `PATH`):
+**1. Install the engine** (shared by all hosts):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+midflight --version
 ```
 
-**3. Install one provider CLI** (authenticate it):
+**2. Install one provider CLI** and authenticate it:
 
-- **Codex** (default): https://github.com/openai/codex
-- **Antigravity** (`agy`): https://antigravity.google/docs/cli/install
-- **OpenCode**: https://opencode.ai/docs/cli/
-- **Oz**: https://docs.warp.dev/reference/cli/cli
-- **Gemini** (enterprise): https://github.com/google-gemini/gemini-cli
-- **Grok Build**: https://docs.x.ai/build/cli/reference
-- **Claude Code**: https://code.claude.com/docs/en/headless
+- [Codex CLI](https://github.com/openai/codex) (default) — `codex --version`
+- [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`) — `agy --version`
+- [OpenCode CLI](https://opencode.ai/docs/cli/) — `opencode --help`
+- [Oz CLI](https://docs.warp.dev/reference/cli/cli) — `oz whoami`
+- [Gemini CLI](https://github.com/google-gemini/gemini-cli) (enterprise) — `gemini --version`
+- [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`) — `grok --version`
+- [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — `claude --version`
 
-**4. Use it:**
+**3. Install the host adapter:**
+
+#### For Grok Bot (Cursor's Grok Bot assistants):
+
+```bash
+# User-wide (Cursor syncs to Cloud Agents via Settings → Agents → Sync Skills)
+mkdir -p ~/.cursor/skills
+cp -R hosts/grok-bot/skills/midflight ~/.cursor/skills/midflight
+cp -R hosts/grok-bot/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
+
+# Or symlink from a checkout:
+ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.cursor/skills/midflight
+ln -s "$(pwd)/hosts/grok-bot/skills/midflight-check-config" ~/.cursor/skills/midflight-check-config
+
+# Project-local (travels with the repo):
+mkdir -p .cursor/skills
+ln -s "$(pwd)/hosts/grok-bot/skills/midflight" .cursor/skills/midflight
+```
+
+#### For Cursor agents (general):
+
+```bash
+# User-wide
+mkdir -p ~/.cursor/skills
+cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight
+cp -R hosts/cursor/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
+
+# Or symlink:
+ln -s "$(pwd)/hosts/cursor/skills/midflight" ~/.cursor/skills/midflight
+```
+
+**Also discovered:** `~/.agents/skills/` and `.agents/skills/` (plus Claude/Codex compat dirs). Prefer `~/.cursor/skills/` for reliable `/slash` invoke.
+
+**4. Verify setup:**
+
+```bash
+# From Grok Bot or Cursor agent:
+/midflight-check-config
+```
+
+**5. Use it:**
 
 ```text
-/mid-flight should we use SSE or WebSockets for real-time updates?
-/mid-flight --video demo.mp4 does this match the storyboard?
+/midflight should we use SSE or WebSockets for real-time updates?
+/midflight implement: add rate limiting to /api/upload, 10 req/min per user
+/midflight --video demo.mp4 does this match the storyboard?
 ```
 
 ### Capability map vs. Claude Code plugin
 
-| Feature | Claude Code Plugin | Grok Bot / Cursor Skill | Notes |
+| Feature | Claude Code Plugin | Grok Bot / Cursor Host | Notes |
 |---|---|---|---|
 | **Consult mode** | ✅ Full | ✅ Full | Advice, validation, debugging |
 | **Implement mode** | ✅ Full | ✅ Full | External model makes scoped edits |
@@ -100,27 +125,25 @@ curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/i
 | **Context extraction** | ✅ Auto | ⚠️ Agent-assisted | Claude writes query; Grok/Cursor agent writes it |
 | **Self-invoke** | ✅ Yes | ⚠️ Manual | Claude can auto-invoke when stuck; Grok/Cursor agents decide |
 | **Provider CLI required** | ✅ Yes | ✅ Yes | Same engine, same provider requirement |
-| **Fallback (no CLI)** | ❌ Fails | ✅ Handoff | Skill suggests teammate/manual run |
 | **Dual-consult** | ❌ Via CLI | ✅ Via CLI | `midflight --dual agy "question"` |
 | **Config** | ✅ Shared | ✅ Shared | `~/.config/mid-flight/config` used by all |
 
 **Bottom line:**
 
-- **Claude Code plugin** = best UX when you're in Claude (auto-context, self-invoke).
-- **Grok Bot / Cursor skill** = portable, same consult quality, agent writes the context instead of Claude.
-- **Provider CLI access matters more than host.** If your Cloud Agent VM or local machine has `codex` / `agy` / `opencode` authenticated, you're good.
+- **Claude Code plugin** = best UX (auto-context, self-invoke)
+- **Grok Bot / Cursor hosts** = same engine, same quality, agent writes context
+- **Provider CLI access matters more than host.** If `codex` / `agy` / `opencode` is authenticated, you're good.
 
-### When provider CLIs are unavailable
+### Host adapter differences
 
-**Cloud Agent fallback:** If the Cursor Cloud Agent environment lacks provider CLIs, the skill can:
+| Host | Directory | Target |
+|---|---|---|
+| `hosts/grok-bot/` | Cursor's Grok Bot assistants | Sand-workflow skills |
+| `hosts/cursor/` | Cursor agents (general) | Agent Skills |
+| `hosts/grok/` | xAI's Grok Build CLI | Grok Build skills (separate from Grok Bot) |
+| `hosts/codex/` | OpenAI Codex CLI | Codex agent skills |
 
-1. Write the consultation query to a file
-2. Use the `Task` tool to hand off to a teammate agent (or local runner) with CLI access
-3. Suggest the user run it manually on a machine with the CLI
-
-**Video review fallback:** Without `agy` or `gemini` CLI, the skill suggests manual review or spawns a `videoReview` subagent (if available in Cloud Agents).
-
-**Philosophy:** Prefer teammate handoffs over blocking. The skill documents the query clearly so another agent or human can complete it.
+All use the same shared engine (`bin/midflight` / `scripts/query.sh`).
 
 ## Install — five doors, same engine
 

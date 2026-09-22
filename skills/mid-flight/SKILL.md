@@ -14,6 +14,36 @@ metadata:
 
 No copy-paste. No rebuilding context. No tool-switching.
 
+## Important: Use the proper host adapter
+
+This root-level skill is a **reference guide**. For actual invocation, use the host-specific adapter:
+
+- **Cursor Grok Bot:** Install from `hosts/grok-bot/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok-bot))
+- **Cursor agents:** Install from `hosts/cursor/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/cursor))
+- **xAI Grok Build CLI:** Install from `hosts/grok/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok))
+- **OpenAI Codex CLI:** Install from `hosts/codex/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/codex))
+- **Claude Code:** Plugin via `claude plugin marketplace add Abeansits/mid-flight` ([README](https://github.com/Abeansits/mid-flight#1-claude-code-plugin))
+
+Each host adapter wires the shared MidFlight engine (`bin/midflight` / `scripts/query.sh`) properly for that environment.
+
+**Quick install for Grok Bot / Cursor:**
+
+```bash
+# 1. Install engine
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+
+# 2. Install provider CLI (e.g., Codex)
+# See: https://github.com/openai/codex
+
+# 3. Copy host adapter skills to ~/.cursor/skills/
+mkdir -p ~/.cursor/skills
+cp -R hosts/grok-bot/skills/midflight ~/.cursor/skills/midflight        # for Grok Bot
+# OR
+cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight          # for Cursor agents
+```
+
+Full instructions: [README § Install for Grok Bot / Cursor](https://github.com/Abeansits/mid-flight#install-for-grok-bot--cursor)
+
 ## When to use this skill
 
 Invoke `/mid-flight` (or let the agent self-invoke) when:
@@ -54,6 +84,8 @@ Analyze video files or YouTube URLs with multimodal models (Antigravity or Gemin
 ```
 
 ## How it works
+
+## How it works (high-level)
 
 ### Prerequisites
 
@@ -171,33 +203,20 @@ midflight --provider agy "$QUERY_FILE"
 
 #### If `midflight` is not available:
 
-**Fallback A (repo-local):** If this skill is in a mid-flight repo checkout:
+Tell the user to install the proper host adapter and engine:
 
-```bash
-bash "$(dirname "$SKILL_PATH")/../../scripts/query.sh" "$QUERY_FILE" consult
-```
-
-**Fallback B (Cloud Agent / teammate handoff):** When provider CLIs are unavailable:
-
-1. Write the query to a shareable file (e.g., `/tmp/midflight-consult-${TIMESTAMP}.md`)
-2. Suggest the user run it manually:
-   ```bash
-   midflight /tmp/midflight-consult-123456.md
-   ```
-3. Or (for Cursor Cloud Agents): use the `Task` tool to spawn a teammate agent with access to the provider CLI
-4. For video: save the prompt and suggest manual review
-
-**Inform the user:**
 ```text
-I've prepared a consultation query, but the midflight engine isn't available.
+MidFlight requires the engine and a host adapter.
 
-Install it with:
-  curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+For Grok Bot / Cursor, follow the install guide:
+https://github.com/Abeansits/mid-flight#install-for-grok-bot--cursor
 
-Then run:
-  midflight <query-file>
+Quick steps:
+1. Install engine: curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+2. Install provider CLI (e.g., Codex)
+3. Copy host adapter skills to ~/.cursor/skills/
 
-Alternatively, I can hand this off to a teammate or Cloud Agent with provider access.
+Then restart and try /midflight again.
 ```
 
 ### 5. Present findings
