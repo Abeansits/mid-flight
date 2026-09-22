@@ -71,19 +71,24 @@ midflight --version
 
 #### For Grok Bot (Cursor's Grok Bot assistants):
 
+**Path A (recommended):** Engine on PATH + copy skills:
+
 ```bash
-# User-wide (Cursor syncs to Cloud Agents via Settings → Agents → Sync Skills)
+# Skills use midflight from PATH (installed in step 1 above)
 mkdir -p ~/.cursor/skills
 cp -R hosts/grok-bot/skills/midflight ~/.cursor/skills/midflight
 cp -R hosts/grok-bot/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
+```
 
-# Or symlink from a checkout:
+**Path B (development):** Symlink skills from repo checkout:
+
+```bash
+# Keep repo tree intact; skills walk up to find hosts/grok-bot/scripts
+mkdir -p ~/.cursor/skills
 ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.cursor/skills/midflight
 ln -s "$(pwd)/hosts/grok-bot/skills/midflight-check-config" ~/.cursor/skills/midflight-check-config
 
-# Project-local (travels with the repo):
-mkdir -p .cursor/skills
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight" .cursor/skills/midflight
+# Optional: export MIDFLIGHT_ROOT="$(pwd)" in shell profile
 ```
 
 #### For Cursor agents (general):
@@ -98,7 +103,7 @@ cp -R hosts/cursor/skills/midflight-check-config ~/.cursor/skills/midflight-chec
 ln -s "$(pwd)/hosts/cursor/skills/midflight" ~/.cursor/skills/midflight
 ```
 
-**Also discovered:** `~/.agents/skills/` and `.agents/skills/` (plus Claude/Codex compat dirs). Prefer `~/.cursor/skills/` for reliable `/slash` invoke.
+**Also discovered:** `~/.agents/skills/` and `.agents/skills/` (plus Claude/Codex compat dirs). Prefer `~/.cursor/skills/` for reliable `/slash` invoke in Cursor Desktop.
 
 **4. Verify setup:**
 
@@ -326,7 +331,7 @@ curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/i
 **Then install the skills** (copy or symlink — recommended):
 
 ```bash
-# User-wide (~/.cursor/skills; can Sync Skills for Cloud Agents)
+# User-wide (~/.cursor/skills)
 mkdir -p ~/.cursor/skills
 cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight
 cp -R hosts/cursor/skills/midflight-check-config ~/.cursor/skills/midflight-check-config

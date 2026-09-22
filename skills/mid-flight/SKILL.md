@@ -16,17 +16,43 @@ No copy-paste. No rebuilding context. No tool-switching.
 
 ## Important: Use the proper host adapter
 
-This root-level skill is a **reference guide**. For actual invocation, use the host-specific adapter:
+This root-level skill is a **reference guide**. For actual invocation, install the host-specific adapter:
 
-- **Cursor Grok Bot:** Install from `hosts/grok-bot/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok-bot))
-- **Cursor agents:** Install from `hosts/cursor/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/cursor))
-- **xAI Grok Build CLI:** Install from `hosts/grok/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok))
-- **OpenAI Codex CLI:** Install from `hosts/codex/skills/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/codex))
+- **Cursor Grok Bot:** `hosts/grok-bot/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok-bot))
+- **Cursor agents:** `hosts/cursor/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/cursor))
+- **xAI Grok Build CLI:** `hosts/grok/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/grok))
+- **OpenAI Codex CLI:** `hosts/codex/` ([README](https://github.com/Abeansits/mid-flight/tree/main/hosts/codex))
 - **Claude Code:** Plugin via `claude plugin marketplace add Abeansits/mid-flight` ([README](https://github.com/Abeansits/mid-flight#1-claude-code-plugin))
 
 Each host adapter wires the shared MidFlight engine (`bin/midflight` / `scripts/query.sh`) properly for that environment.
 
-**Quick install for Grok Bot / Cursor:**
+## Three modes (inferred automatically)
+
+MidFlight infers the mode from your question. When uncertain, defaults to **consult** (safe).
+
+### 1. Consult (default)
+Advice only, no file changes. Architecture, tradeoffs, sanity checks, debugging guidance.
+
+```text
+/midflight should we use SSE or WebSockets for real-time updates?
+```
+
+### 2. Implement
+Precise, spec'd file changes executed by the external model. Use only when the change is narrow and well-defined.
+
+```text
+/midflight implement: add rate limiting to the /api/upload endpoint using sliding window, 10 req/min per user
+```
+
+### 3. Video
+Analyze video files or YouTube URLs with multimodal models (Antigravity or Gemini).
+
+```text
+/midflight --video demo-v3.mp4 does this match the storyboard?
+/midflight --video https://youtube.com/watch?v=... what accessibility issues do you see?
+```
+
+## Quick install for Grok Bot / Cursor
 
 ```bash
 # 1. Install engine
@@ -44,83 +70,11 @@ cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight          # for Cu
 
 Full instructions: [README § Install for Grok Bot / Cursor](https://github.com/Abeansits/mid-flight#install-for-grok-bot--cursor)
 
-## When to use this skill
+## Provider notes
 
-Invoke `/mid-flight` (or let the agent self-invoke) when:
-
-- **Stuck after 3+ attempts** — different approaches all failed
-- **Architectural validation** — before committing to a design
-- **Technology uncertainty** — unfamiliar API or stack choice
-- **Equal tradeoffs** — two valid approaches, need outside perspective
-- **Cryptic errors** — debugging stalled after reasonable investigation
-- **Video review** — analyze demo recordings or YouTube URLs
-
-The agent should be transparent when self-invoking: "I'm consulting an external model because..."
-
-## Three modes (inferred automatically)
-
-MidFlight infers the mode from your question. When uncertain, defaults to **consult** (safe).
-
-### 1. Consult (default)
-Advice only, no file changes. Architecture, tradeoffs, sanity checks, debugging guidance.
-
-```text
-/mid-flight should we use SSE or WebSockets for real-time updates?
-```
-
-### 2. Implement
-Precise, spec'd file changes executed by the external model. Use only when the change is narrow and well-defined.
-
-```text
-/mid-flight implement: add rate limiting to the /api/upload endpoint using sliding window, 10 req/min per user
-```
-
-### 3. Video
-Analyze video files or YouTube URLs with multimodal models (Antigravity or Gemini).
-
-```text
-/mid-flight --video demo-v3.mp4 does this match the storyboard?
-/mid-flight --video https://youtube.com/watch?v=... what accessibility issues do you see?
-```
-
-## How it works
-
-## How it works (high-level)
-
-### Prerequisites
-
-**Required:** `bash` and **one provider CLI** on your `PATH`, authenticated:
-
-- [Codex CLI](https://github.com/openai/codex) (default, most common)
-- [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`)
-- [OpenCode CLI](https://opencode.ai/docs/cli/)
-- [Oz CLI](https://docs.warp.dev/reference/cli/cli)
-- [Gemini CLI](https://github.com/google-gemini/gemini-cli) (enterprise/API-key only)
-- [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`)
-- [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`)
-
-**Install the engine:**
-
-```bash
-# Quick install (puts midflight on PATH)
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-
-# Or from a checkout:
-git clone https://github.com/Abeansits/mid-flight.git
-cd mid-flight
-./scripts/install.sh --from-dir . --prefix ~/.local
-```
-
-Verify:
-```bash
-midflight --version
-```
-
-### Provider notes
-
-- **Cursor agents:** No `provider=cursor` yet (roadmap item). Default `provider=codex` works great — that's a different harness, not circular.
-- **Grok Bot:** Automatically avoids circular `provider=grok` unless you pass `--allow-grok-provider`. Prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude`.
-- **From Codex:** Avoids circular `provider=codex` unless `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1`.
+- **Cursor Grok Bot / Cursor agents:** No `provider=cursor` exists yet. Default `provider=codex` is fine (external consult).
+- **Grok Build CLI:** Has circular guard to avoid `provider=grok` on Grok Build host unless `--allow-grok-provider` passed.
+- **Codex CLI:** Has circular guard to avoid `provider=codex` on Codex host unless `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` set.
 
 Configure via `~/.config/mid-flight/config`:
 ```
@@ -131,181 +85,35 @@ codex_reasoning_effort=high
 
 Full config reference: [README § Config](https://github.com/Abeansits/mid-flight#config)
 
-## Agent instructions
+## When to invoke
 
-When a user invokes `/mid-flight`:
-
-### 1. Parse the invocation
-
-- **`--video <file-or-url> [prompt]`** → video mode
-- **Text question** → consult or implement (infer from specificity)
-- **Empty** → identify what would most benefit from outside perspective
-
-Optional flags:
-- `--provider <name>` — override configured provider
-- `--allow-grok-provider` — allow circular Grok → Grok (if on Grok Bot)
-- `--allow-codex-provider` — allow circular Codex → Codex (if on Codex)
-
-### 2. Classify intent
-
-Set `MODE` based on the question:
-
-- **`video`** — `--video` present
-- **`consult`** — questions, tradeoffs, validation. **Default when uncertain.**
-- **`implement`** — precise, actionable file-change spec only
-
-### 3. Build context
-
-For **consult** or **implement**, create a temporary query file:
-
-```markdown
-## Context
-[Concise summary: what's being built, current state, key files, relevant errors/code snippets]
-
-## Question
-[Specific question or problem statement]
-```
-
-For **video**, prepare a prompt with session context:
-
-```text
-Context: [summary of what we're building and why this video matters]
-
-Question: [user's question about the video]
-```
-
-### 4. Execute
-
-Check if `midflight` is available:
-
-```bash
-command -v midflight >/dev/null 2>&1
-```
-
-#### If `midflight` is on PATH (recommended):
-
-```bash
-# Consult
-midflight "$QUERY_FILE"
-
-# Implement
-midflight -m implement "$QUERY_FILE"
-
-# Video with custom prompt
-midflight --video "$VIDEO_PATH" "$VIDEO_PROMPT"
-
-# Video with default breakdown
-midflight --video "$VIDEO_PATH"
-
-# Override provider
-midflight --provider agy "$QUERY_FILE"
-```
-
-#### If `midflight` is not available:
-
-Tell the user to install the proper host adapter and engine:
-
-```text
-MidFlight requires the engine and a host adapter.
-
-For Grok Bot / Cursor, follow the install guide:
-https://github.com/Abeansits/mid-flight#install-for-grok-bot--cursor
-
-Quick steps:
-1. Install engine: curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-2. Install provider CLI (e.g., Codex)
-3. Copy host adapter skills to ~/.cursor/skills/
-
-Then restart and try /midflight again.
-```
-
-### 5. Present findings
-
-Share the external model's response, then add **your analysis**:
-
-- Where you agree or disagree
-- Recommended next step given both perspectives
-- New concerns you hadn't considered
-- For video: most actionable feedback and quality issues
-
-**Example:**
-
-```text
-**Codex recommends:** Start with SSE.
-
-Why:
-- Updates are one-way server → client
-- SSE fits existing HTTP auth
-- Easier to debug and roll back
-
-Watchouts:
-- If client-to-server events become necessary, revisit WebSockets
-- Confirm load balancer handles long-lived HTTP
-
----
-
-**My take:** I agree. SSE is lower-risk and faster to ship. We can keep the event payload transport-agnostic so a future WebSocket move stays cheap.
-
-**Next step:** Implement SSE for notifications. I'll add it now.
-```
-
-## Dual-consult (advanced)
-
-Ask two providers the same question and compare answers:
-
-```bash
-midflight --dual agy "should we use SSE or WebSockets?"
-# or explicit:
-midflight --providers codex,agy "..."
-```
-
-Currently consult-only. Agents can run this manually and present both responses.
+- **Stuck after 3+ attempts** — different approaches all failed
+- **Architectural validation** — before committing to a design
+- **Technology uncertainty** — unfamiliar API or stack choice
+- **Equal tradeoffs** — two valid approaches, need outside perspective
+- **Cryptic errors** — debugging stalled after reasonable investigation
+- **Video review** — analyze demo recordings or YouTube URLs
 
 ## Troubleshooting
 
-**Validate setup:**
-```bash
-midflight --version
-bash scripts/check-config.sh
-```
+If `/midflight` fails, run `/midflight-check-config` (or `midflight --version` from terminal) to validate setup.
 
 **Common errors:**
 
 | Error | Fix |
 |---|---|
-| `'codex' CLI not found` | [Install Codex](https://github.com/openai/codex) |
-| `'agy' CLI not found` | [Install Antigravity](https://antigravity.google/docs/cli/install) |
+| `midflight not found` | Install: `curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh \| bash` |
+| `'codex' CLI not found` | Install provider: [Codex](https://github.com/openai/codex) |
 | `Codex query failed` | Check auth: `codex --version` |
 | `Empty response` | Retry or switch `provider=` in `~/.config/mid-flight/config` |
-| `Video exceeds 20MB limit` | Compress or trim (Gemini inline-file limit) |
 
-**Enable debug logging:**
-```bash
-export MIDFLIGHT_DEBUG=1
-midflight <query>
-```
-
-## Configuration reference
-
-Create `~/.config/mid-flight/config`:
-
-```
-provider=codex
-codex_model=gpt-5.4
-codex_reasoning_effort=high
-agy_model=
-agy_effort=
-gemini_model=gemini-2.5-pro
-```
-
-Full settings: [README § Config](https://github.com/Abeansits/mid-flight#config)
+Debug logging: `export MIDFLIGHT_DEBUG=1`
 
 ## See also
 
 - **Main README:** https://github.com/Abeansits/mid-flight#readme
-- **Standalone CLI docs:** [docs/standalone-usage.md](https://github.com/Abeansits/mid-flight/blob/main/docs/standalone-usage.md)
-- **Host-specific adapters:** `hosts/cursor/`, `hosts/grok/`, `hosts/codex/`
 - **Provider capabilities:** [README § Providers](https://github.com/Abeansits/mid-flight#providers)
+- **Host adapters:** `hosts/cursor/`, `hosts/grok-bot/`, `hosts/grok/`, `hosts/codex/`
 
 ---
 

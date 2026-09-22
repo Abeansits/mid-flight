@@ -27,39 +27,59 @@ When a `cursor` provider is added later (ROADMAP waitlists `agent -p --mode=ask`
 
 ## Install doors
 
-Install into Cursor's agent skill discovery paths so Grok Bot can find them:
+**Two paths:**
+
+### A. Skills + engine on PATH (recommended for most users)
+
+Install the standalone CLI, then copy skills:
 
 ```bash
-# User-wide (syncs to Cloud Agents via Cursor Settings → Agents → Sync Skills)
+# 1. Install engine to PATH
+curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+midflight --version
+
+# 2. Install provider CLI (e.g., Codex)
+# See: https://github.com/openai/codex
+
+# 3. Copy skills to Grok Bot / Cursor discovery path
 mkdir -p ~/.cursor/skills
 cp -R hosts/grok-bot/skills/midflight ~/.cursor/skills/midflight
 cp -R hosts/grok-bot/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
-# or: ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.cursor/skills/midflight
-
-# Project-local
-mkdir -p .cursor/skills
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight" .cursor/skills/midflight
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight-check-config" .cursor/skills/midflight-check-config
-
-# Also discovered: ~/.agents/skills/ and .agents/skills/
-# (plus Claude/Codex compat dirs). Prefer ~/.cursor/skills/ for reliable /slash invoke.
-mkdir -p ~/.agents/skills
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.agents/skills/midflight
 ```
 
-### Engine install
+The skills will use `midflight` from PATH.
 
-Engine must be reachable (`midflight` on `PATH` or `MIDFLIGHT_ROOT`):
+### B. Repo-local symlinks with MIDFLIGHT_ROOT (for development)
+
+Keep the repo tree intact and symlink skills:
 
 ```bash
-# Quick install (puts midflight on PATH)
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+# 1. Clone the repo
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
 
-# Or from a checkout:
-./scripts/install.sh --from-dir . --prefix ~/.local
+# 2. Install provider CLI (e.g., Codex)
+
+# 3. Symlink skills into discovery path
+mkdir -p ~/.cursor/skills
+ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.cursor/skills/midflight
+ln -s "$(pwd)/hosts/grok-bot/skills/midflight-check-config" ~/.cursor/skills/midflight-check-config
+
+# 4. Optional: Set MIDFLIGHT_ROOT in your shell profile
+export MIDFLIGHT_ROOT="$(pwd)"
 ```
 
-See the root [README](../../README.md) for the full install door.
+The skills will walk up to find `hosts/grok-bot/scripts/` and the engine root.
+
+### Alternative discovery paths
+
+- `~/.agents/skills/` — cross-agent compatible
+- `.cursor/skills/` — project-local
+- `.agents/skills/` — project-local cross-agent
+
+Prefer `~/.cursor/skills/` for reliable `/slash` invoke in Cursor Desktop / Grok Bot. Cloud Agent skill sync behavior may vary; verify skill availability in your Cloud Agent environment.
+
+See the root [README](../../README.md) for full install options.
 
 ## CI note
 
