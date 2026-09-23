@@ -33,6 +33,8 @@
 >you just stopped letting the guy grade his own homework
 ```
 
+## Usage example
+
 ```text
 /midflight should we use SSE or WebSockets for real-time updates?
 ```
