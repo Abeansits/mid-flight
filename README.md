@@ -83,6 +83,9 @@ You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 - [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`)
 - [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — useful as a provider from non-Claude hosts
 
+<details>
+<summary><strong>1. Claude Code plugin</strong></summary>
+
 ### 1. Claude Code plugin
 
 ```bash
@@ -99,6 +102,11 @@ Restart Claude Code, then:
 ```
 
 Claude already has the session, so it writes the context summary for you. It can also self-invoke after it is clearly stuck (multiple failed attempts, unfamiliar stack, two equally valid approaches) — and it says so when it does.
+
+</details>
+
+<details>
+<summary><strong>2. Standalone CLI</strong></summary>
 
 ### 2. Standalone CLI
 
@@ -155,6 +163,10 @@ midflight --video ./ad-v3.mp4 "does this match the storyboard?"
 
 Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).
 
+</details>
+
+<details>
+<summary><strong>3. Codex skills</strong></summary>
 
 ### 3. Codex skills
 
@@ -194,6 +206,11 @@ $midflight-check-config             # validate provider setup
 ```
 
 Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
+
+</details>
+
+<details>
+<summary><strong>4. Grok Build skills</strong></summary>
 
 ### 4. Grok Build skills
 
@@ -236,6 +253,10 @@ Restart Grok Build (or open the extensions modal with `/skills`), then:
 
 Because the host is Grok Build, MidFlight will **not** silently use `provider=grok` (circular). It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` (or pass `--allow-grok-provider`) to force Grok anyway. The default provider is often `codex`, which is already a fine external consult.
 
+</details>
+
+<details>
+<summary><strong>5. Cursor skills</strong></summary>
 
 ### 5. Cursor skills
 
@@ -283,6 +304,8 @@ Restart Cursor (or open a new Agent chat), then:
 ```
 
 There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cursor` does not apply. The default provider is often `codex`, which is a fine external consult from Cursor.
+
+</details>
 
 ## Providers
 
