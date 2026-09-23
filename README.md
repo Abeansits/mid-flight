@@ -42,114 +42,6 @@ You don't pick the mode. MidFlight infers it from the question. Uncertain → co
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
-## Install for Grok Bot / Cursor
-
-**Real host adapters** for Cursor's Grok Bot and Cursor agents. These wire the shared MidFlight engine so `/midflight` actually works.
-
-**Important:** "Grok Bot" = Cursor's Grok Bot assistants. For xAI's Grok Build CLI, see [§4. Grok Build skills](#4-grok-build-skills).
-
-### Quick start
-
-**1. Install the engine** (shared by all hosts):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-midflight --version
-```
-
-**2. Install one provider CLI** and authenticate it:
-
-- [Codex CLI](https://github.com/openai/codex) (default) — `codex --version`
-- [Antigravity CLI](https://antigravity.google/docs/cli/install) (`agy`) — `agy --version`
-- [OpenCode CLI](https://opencode.ai/docs/cli/) — `opencode --help`
-- [Oz CLI](https://docs.warp.dev/reference/cli/cli) — `oz whoami`
-- [Gemini CLI](https://github.com/google-gemini/gemini-cli) (enterprise) — `gemini --version`
-- [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`) — `grok --version`
-- [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — `claude --version`
-
-**3. Install the host adapter:**
-
-#### For Grok Bot (Cursor's Grok Bot assistants):
-
-**Path A (recommended):** Engine on PATH + copy skills:
-
-```bash
-# Skills use midflight from PATH (installed in step 1 above)
-mkdir -p ~/.cursor/skills
-cp -R hosts/grok-bot/skills/midflight ~/.cursor/skills/midflight
-cp -R hosts/grok-bot/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
-```
-
-**Path B (development):** Symlink skills from repo checkout:
-
-```bash
-# Keep repo tree intact; skills walk up to find hosts/grok-bot/scripts
-mkdir -p ~/.cursor/skills
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight" ~/.cursor/skills/midflight
-ln -s "$(pwd)/hosts/grok-bot/skills/midflight-check-config" ~/.cursor/skills/midflight-check-config
-
-# Optional: export MIDFLIGHT_ROOT="$(pwd)" in shell profile
-```
-
-#### For Cursor agents (general):
-
-```bash
-# User-wide
-mkdir -p ~/.cursor/skills
-cp -R hosts/cursor/skills/midflight ~/.cursor/skills/midflight
-cp -R hosts/cursor/skills/midflight-check-config ~/.cursor/skills/midflight-check-config
-
-# Or symlink:
-ln -s "$(pwd)/hosts/cursor/skills/midflight" ~/.cursor/skills/midflight
-```
-
-**Also discovered:** `~/.agents/skills/` and `.agents/skills/` (plus Claude/Codex compat dirs). Prefer `~/.cursor/skills/` for reliable `/slash` invoke in Cursor Desktop.
-
-**4. Verify setup:**
-
-```bash
-# From Grok Bot or Cursor agent:
-/midflight-check-config
-```
-
-**5. Use it:**
-
-```text
-/midflight should we use SSE or WebSockets for real-time updates?
-/midflight implement: add rate limiting to /api/upload, 10 req/min per user
-/midflight --video demo.mp4 does this match the storyboard?
-```
-
-### Capability map vs. Claude Code plugin
-
-| Feature | Claude Code Plugin | Grok Bot / Cursor Host | Notes |
-|---|---|---|---|
-| **Consult mode** | ✅ Full | ✅ Full | Advice, validation, debugging |
-| **Implement mode** | ✅ Full | ✅ Full | External model makes scoped edits |
-| **Video analysis** | ✅ Full | ✅ Full | Antigravity/Gemini multimodal |
-| **Context extraction** | ✅ Auto | ⚠️ Agent-assisted | Claude writes query; Grok/Cursor agent writes it |
-| **Self-invoke** | ✅ Yes | ⚠️ Manual | Claude can auto-invoke when stuck; Grok/Cursor agents decide |
-| **Provider CLI required** | ✅ Yes | ✅ Yes | Same engine, same provider requirement |
-| **Dual-consult** | ❌ Via CLI | ✅ Via CLI | `midflight --dual agy "question"` |
-| **Config** | ✅ Shared | ✅ Shared | `~/.config/mid-flight/config` used by all |
-
-**Bottom line:**
-
-- **Claude Code plugin** = best UX (auto-context, self-invoke)
-- **Grok Bot / Cursor hosts** = same engine, same quality, agent writes context
-- **Provider CLI access matters more than host.** If `codex` / `agy` / `opencode` is authenticated, you're good.
-
-### Host adapter differences
-
-| Host | Directory | Target |
-|---|---|---|
-| `hosts/grok-bot/` | Cursor Grok Bot (desktop assistant) | Agent Skills |
-| `hosts/cursor/` | Cursor agents (general) | Agent Skills |
-| `hosts/grok/` | xAI's Grok Build CLI | Grok Build skills |
-| `hosts/codex/` | OpenAI Codex CLI | Codex agent skills |
-
-All use the same shared engine (`bin/midflight` / `scripts/query.sh`).
-
 ## Install — five doors, same engine
 
 You need `bash` and **one** provider CLI on your `PATH`, authenticated:
@@ -318,7 +210,7 @@ Because the host is Grok Build, MidFlight will **not** silently use `provider=gr
 
 ### 5. Cursor skills
 
-Same engine, for [Cursor](https://cursor.com/docs/skills) (`/midflight` Agent Skills).
+Same engine, for [Cursor](https://cursor.com/docs/skills) (`/midflight` Agent Skills). Cursor agents and Cursor's Grok Bot both load `~/.cursor/skills/`, so this is the adapter for both. xAI's Grok Build CLI is [§4](#4-grok-build-skills), not this one.
 
 **Engine first** (the skills call it):
 
@@ -497,7 +389,7 @@ Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.
 
 MidFlight is a thin router over other agents' CLIs.
 
-- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), Cursor (`/midflight` skills under `hosts/cursor/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
+- **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), Cursor and Cursor Grok Bot (`/midflight` skills under `hosts/cursor/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.
 - **Provider** — `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude`. Isolated behind `query_<name>` in `scripts/lib/providers.sh`. Adding one is a new function, a router case, config keys, and tests.
 
