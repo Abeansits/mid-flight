@@ -59,9 +59,17 @@ Codex consult (and other non-implement text modes) use `--sandbox read-only`; on
 
 Evidence that session/scratch still works under read-only: Codex CLI (`codex exec --help`, 0.154.0) documents `--sandbox` as the policy **for model-generated shell commands** only. Host session/rollout persistence is a separate path (`$CODEX_HOME`; `--ephemeral` opts out). Upstream issue openai/codex#42398 likewise states the flag “controls the worker’s tool execution.” The PR #9 deferral worry does not apply.
 
-### 7. Real CLI install — this PR → v1.14.0
+### 7. Real CLI install — shipped on `main` (v1.14.0, PR #21)
 
-`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb` (tap not published; install via `brew install --HEAD --formula ./Formula/midflight.rb` from a checkout). Version still lives in `.claude-plugin/plugin.json`; split that when the CLI is a real distribution.
+`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb`. The tap is not published. Homebrew 7 will not install a formula that is not in a tap (`brew install --formula ./Formula/midflight.rb` is rejected). Version is written to both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` by `scripts/release.sh prepare`.
+
+### 8. Dual-consult overlay on a real `$HOME` — shipped on `main` (v1.15.1, PR #24)
+
+`--dual` / `--providers` called `build_config_home` twice into the same temp home. A populated `$HOME` made the second `ln` fail with `File exists`, so provider B never ran. Each side now wipes the overlay and uses `ln -sfn`. Regression puts a file and a dotfile in `$HOME`.
+
+### 9. One Cursor skill path — shipped on `main` (PR #26)
+
+Removed `hosts/grok-bot/` and the docs-only `skills/mid-flight/SKILL.md` (no `run.sh`). Cursor agents and Cursor's Grok Bot both use `hosts/cursor/`. The grok-bot run-query test was the macOS CI failure: bash 3.2 treats an empty `"${array[@]}"` as unset under `set -u`.
 
 ## Later
 
