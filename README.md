@@ -1,5 +1,15 @@
 # MidFlight
 
+<p align="center">
+  <img src="docs/logo.png" width="160" alt="MidFlight">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Abeansits/mid-flight/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Abeansits/mid-flight?style=flat-square"></a>
+  <a href="https://github.com/Abeansits/mid-flight/actions/workflows/shell-tests.yml"><img alt="Shell tests" src="https://img.shields.io/github/actions/workflow/status/Abeansits/mid-flight/shell-tests.yml?branch=main&style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/Abeansits/mid-flight?style=flat-square"></a>
+</p>
+
 ```text
 >be me
 >three hours into the refactor
