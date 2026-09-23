@@ -1,10 +1,27 @@
 # MidFlight
 
-**Get a second opinion from another coding agent without leaving the one you're already in.**
-
-You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude, then brings their answer back into your session.
-
-No copy-paste. No rebuilding context. No switching tools.
+```text
+>be me
+>three hours into the refactor
+>agent says the design is sound
+>agent also wrote the design
+>conflict of interest detected
+>open a new chat
+>paste half the repo
+>forget which file was the bug
+>no
+>/midflight
+>a tight summary goes to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude
+>their answer comes back into the same session
+>no copy-paste
+>no second tab
+>no "certainly, let me restate your question"
+>mfw the other model finds the hole in four lines
+>or you hand it one precise change and it just does that
+>not "rewrite the app bestie"
+>you still decide
+>you just stopped letting the guy grade his own homework
+```
 
 ```text
 /midflight should we use SSE or WebSockets for real-time updates?
