@@ -27,7 +27,7 @@ Skills under `hosts/grok/skills/` (`/midflight`, `/midflight-check-config`), sam
 
 Skills under `hosts/cursor/skills/` (`/midflight`, `/midflight-check-config`), same engine resolution as Codex/Grok. **No** circular guard: `provider=cursor` does not exist yet (waitlisted `agent -p --mode=ask`), so default `provider=codex` is fine from Cursor. Install via copy/symlink into `~/.cursor/skills/`, project `.cursor/skills/`, or `~/.agents/skills/`; path-scoped `npx skills add Abeansits/mid-flight/hosts/cursor/skills --agent cursor` also works (plain repo install is ambiguous vs Codex/Grok skill names).
 
-The planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Standalone CLI Path (a) shipped in PR #7.
+The planned host-adapter set (Claude `commands/` + Codex + Grok + Cursor) is complete. Cursor's Grok Bot loads the Cursor skills (`~/.cursor/skills/`); it is not a separate host. Standalone CLI Path (a) shipped in PR #7.
 
 ### 3. First-class provider harnesses — shipped on `main` (v1.10.0, PR #17)
 

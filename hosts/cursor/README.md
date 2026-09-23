@@ -21,6 +21,8 @@ When `$MIDFLIGHT_ROOT` is set and contains `bin/midflight`, that binary is prefe
 
 MidFlight has **no** `provider=cursor` yet (ROADMAP waitlists `agent -p --mode=ask`), so `host=Cursor` + `provider=cursor` circularity is N/A. The default provider is often `codex`, which is a fine external consult from Cursor. When a `cursor` provider is added later, reconsider a circular guard (similar to the Codex host).
 
+Cursor's Grok Bot uses this same adapter. Both discover `~/.cursor/skills/`. There is no separate `hosts/grok-bot/` tree. xAI's Grok Build CLI is `hosts/grok/`.
+
 ## Install doors
 
 Prefer a simple copy or symlink into Cursor's skill discovery paths:
