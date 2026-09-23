@@ -139,4 +139,17 @@ write_agy_stub "b"
 output="$(run_cli --providers codex,antigravity "alias?")"
 assert_contains "$output" "## Provider B: Antigravity" "antigravity alias normalizes for display"
 
+# Regression: dual rebuilds the config-home overlay twice. A populated HOME
+# (any extra file) used to make the second `ln -s` fail with "File exists".
+printf 'not-empty\n' > "$HOME/ai-platform-weekly-2026-06-01.md"
+mkdir -p "$HOME/.hidden-config"
+printf 'dot\n' > "$HOME/.dual-overlay-dotfile"
+write_grok_stub "grok-home-ok"
+write_claude_stub "claude-home-ok"
+output="$(run_cli --providers grok,claude "populated home?")"
+assert_contains "$output" "## Provider A: Grok" "populated HOME still labels A"
+assert_contains "$output" "grok-home-ok" "populated HOME still prints A"
+assert_contains "$output" "## Provider B: Claude" "populated HOME still labels B"
+assert_contains "$output" "claude-home-ok" "populated HOME still prints B"
+
 echo "PASS: dual-consult CLI (--dual / --providers) prints both answers and frames disagreement"

@@ -281,6 +281,8 @@ WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
 
 # Symlink each entry of src into dest, skipping one name. Lets the temp config
 # home mirror the real home so passthrough still resolves there.
+# -f: dual-consult calls build_config_home once per side; replace existing links.
+# -n: if dest is a symlink, replace it rather than following into a directory.
 mirror_dir() {
   local src="$1" dest="$2" skip="$3" entry base
   [ -d "$src" ] || return 0
@@ -288,7 +290,7 @@ mirror_dir() {
     [ -e "$entry" ] || continue
     base="${entry##*/}"
     [ "$base" = "$skip" ] && continue
-    ln -s "$entry" "$dest/$base"
+    ln -sfn "$entry" "$dest/$base"
   done
 }
 
@@ -296,8 +298,13 @@ mirror_dir() {
 # the engine or the user's real config. The engine only reads $HOME for the
 # config file, but provider CLIs read $HOME for their own auth, so the real
 # home's contents are symlinked through; only the mid-flight config is replaced.
+#
+# Dual-consult invokes this twice (once per provider) into the same WORKDIR.
+# Wipe first so a populated real HOME does not make the second `ln` fail with
+# "File exists".
 build_config_home() {
   local home_dir="$WORKDIR/home"
+  rm -rf "$home_dir"
   mkdir -p "$home_dir/.config/mid-flight"
   mirror_dir "$HOME" "$home_dir" ".config"
   mirror_dir "$HOME/.config" "$home_dir/.config" "mid-flight"
