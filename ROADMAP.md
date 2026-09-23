@@ -59,13 +59,25 @@ Codex consult (and other non-implement text modes) use `--sandbox read-only`; on
 
 Evidence that session/scratch still works under read-only: Codex CLI (`codex exec --help`, 0.154.0) documents `--sandbox` as the policy **for model-generated shell commands** only. Host session/rollout persistence is a separate path (`$CODEX_HOME`; `--ephemeral` opts out). Upstream issue openai/codex#42398 likewise states the flag “controls the worker’s tool execution.” The PR #9 deferral worry does not apply.
 
-### 7. Real CLI install — this PR → v1.14.0
+### 7. Real CLI install — shipped on `main` (v1.14.0, PR #21)
 
-`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb` (tap not published; install via `brew install --HEAD --formula ./Formula/midflight.rb` from a checkout). Version still lives in `.claude-plugin/plugin.json`; split that when the CLI is a real distribution.
+`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb`. Tap is not published. Homebrew 7 rejects `brew install --formula ./Formula/midflight.rb` unless the formula is in a tap; the formula still documents `brew install --HEAD --formula ./Formula/midflight.rb` from a checkout. Version lives in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (`scripts/release.sh prepare` writes both).
+
+### 8. Cursor Grok Bot host — shipped on `main` (v1.15.0, PR #22)
+
+`hosts/grok-bot/` matches `hosts/cursor/`: `/midflight` and `/midflight-check-config`, engine resolution `PATH` → `MIDFLIGHT_ROOT` → repo walk-up. No circular guard (`provider=grok-bot` and `provider=cursor` do not exist). Version bump is PR #23.
+
+Repo-root `skills/mid-flight/SKILL.md` is docs-only (no `scripts/run.sh`). It tells you to install a host adapter.
+
+Known smell: `hosts/grok-bot` and `hosts/cursor` both install into `~/.cursor/skills/midflight` (and `midflight-check-config`) and overwrite each other. The root skill has no `run.sh`, so `npx skills add` on the repo root is not an invocable adapter.
+
+### 9. Dual-consult config-home overlay — shipped on `main` (v1.15.1, PR #24)
+
+`--dual` / `--providers` called `build_config_home` twice into the same `$WORKDIR/home`. A populated `$HOME` made the second `ln` fail with `File exists`, so provider B never ran. Each call now wipes `$WORKDIR/home` first and mirrors with `ln -sfn`. Regression: `tests/cli_dual_consult.sh` (a file plus a dotfile in `$HOME`, then `--providers grok,claude`). Plugin and marketplace versions are `1.15.1`.
 
 ## Later
 
-_(none queued — next items TBD)_
+- Homebrew tap still not published (in-repo formula only; see item 7).
 
 ## Out of scope unless asked
 
