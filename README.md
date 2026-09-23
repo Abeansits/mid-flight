@@ -6,10 +6,10 @@
 >agent says the design is sound
 >agent also wrote the design
 >conflict of interest detected
->open a new chat
->paste half the repo
->forget which file was the bug
->no
+>think about opening a new chat
+>paste half the repo in
+>immediately forget which file was the bug
+>scrap that plan
 >/midflight
 >a tight summary goes to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude
 >their answer comes back into the same session
