@@ -1,9 +1,9 @@
 # shellcheck shell=bash disable=SC2034
 
 provider="codex"
-codex_model="gpt-5.4"
+codex_model="gpt-6-sol"
 codex_reasoning_effort="high"
-gemini_model="gemini-2.5-pro"
+gemini_model="gemini-3.1-pro-preview"
 agy_model=""
 agy_effort=""
 opencode_model=""
