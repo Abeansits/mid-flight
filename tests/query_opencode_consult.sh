@@ -125,6 +125,20 @@ assert_eq "json" "$(cat "$TEST_DIR/opencode_format.txt")" "v2 should preserve JS
 
 write_config <<'EOF'
 provider=opencode
+opencode_model=
+opencode_variant=high
+opencode_format=default
+EOF
+stderr="$(run_query "$QUERY_FILE" consult 2>&1 >/dev/null)"
+assert_eq "" "$(cat "$TEST_DIR/opencode_model.txt")" "v2 should leave the CLI default model intact for the built-in variant"
+if printf '%s\n' "$stderr" | grep -q "ignored without opencode_model"; then
+  echo "FAIL: built-in variant high should not warn when no model is set" >&2
+  printf '%s\n' "$stderr" >&2
+  exit 1
+fi
+
+write_config <<'EOF'
+provider=opencode
 opencode_model=anthropic/claude-sonnet-4-0
 opencode_variant=
 EOF
