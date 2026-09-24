@@ -360,7 +360,7 @@ claude_model=
 | `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
 | `gemini_model` | `gemini-2.5-pro` | Gemini model (enterprise / API-key path) |
 | `opencode_model` | unset | Leave blank for the OpenCode CLI default |
-| `opencode_variant` | `high` | e.g. `minimal`, `high`, `max` |
+| `opencode_variant` | `high` | e.g. `minimal`, `high`, `max`. On OpenCode v2+, appended as `#variant` only when `opencode_model` is set. A custom variant without a model is logged and skipped; the built-in `high` default is not |
 | `opencode_format` | `default` | `default` or `json` |
 | `oz_model` | `auto` | `auto` is the general-purpose default; `auto-genius` for heavy consults |
 | `oz_output_format` | `text` | Capture format |
