@@ -146,11 +146,11 @@ run_query "$QUERY_FILE" consult > /dev/null
 assert_eq "anthropic/claude-sonnet-4-0#high" "$(cat "$TEST_DIR/opencode_model.txt")" "v2 should encode the default configured variant"
 
 # The config loader treats blank variants as the default. Exercise an actually
-# empty variant directly at the provider boundary. Pin the version here rather
-# than inheriting whatever the loop above left exported.
+# empty variant directly at the provider boundary. Pin the version in this
+# shell; the subshell only isolates the sourced provider functions.
+OPENCODE_TEST_VERSION='opencode v2.0.15'
+OPENCODE_TEST_VERSION_STATUS=0
 (
-  export OPENCODE_TEST_VERSION='opencode v2.0.15'
-  export OPENCODE_TEST_VERSION_STATUS=0
   source "$ROOT_DIR/scripts/lib/providers.sh"
   RUN_DIR="$TEST_DIR"
   opencode_model='anthropic/claude-sonnet-4-0'
