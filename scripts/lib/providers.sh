@@ -200,6 +200,8 @@ query_opencode() {
     # Preserve an explicit model suffix over the default configured variant.
     if [ -n "$model" ] && [ -n "$opencode_variant" ] && [[ "$model" != *'#'* ]]; then
       model="${model}#${opencode_variant}"
+    elif [ -z "$model" ] && [ -n "$opencode_variant" ]; then
+      log "opencode: v2 has no standalone variant flag; opencode_variant=$opencode_variant is ignored without opencode_model"
     fi
   else
     # Preserve v1 behavior if an older CLI cannot report its version.

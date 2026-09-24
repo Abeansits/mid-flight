@@ -118,8 +118,9 @@ opencode_model=
 opencode_variant=max
 opencode_format=json
 EOF
-run_query "$QUERY_FILE" consult > /dev/null
+stderr="$(run_query "$QUERY_FILE" consult 2>&1 > /dev/null)"
 assert_eq "" "$(cat "$TEST_DIR/opencode_model.txt")" "v2 should leave the CLI default model intact"
+assert_contains "$stderr" "opencode_variant=max is ignored without opencode_model" "v2 should warn when a variant cannot be applied"
 assert_eq "json" "$(cat "$TEST_DIR/opencode_format.txt")" "v2 should preserve JSON format"
 
 write_config <<'EOF'
@@ -131,8 +132,11 @@ run_query "$QUERY_FILE" consult > /dev/null
 assert_eq "anthropic/claude-sonnet-4-0#high" "$(cat "$TEST_DIR/opencode_model.txt")" "v2 should encode the default configured variant"
 
 # The config loader treats blank variants as the default. Exercise an actually
-# empty variant directly at the provider boundary.
+# empty variant directly at the provider boundary. Pin the version here rather
+# than inheriting whatever the loop above left exported.
 (
+  export OPENCODE_TEST_VERSION='opencode v2.0.15'
+  export OPENCODE_TEST_VERSION_STATUS=0
   source "$ROOT_DIR/scripts/lib/providers.sh"
   RUN_DIR="$TEST_DIR"
   opencode_model='anthropic/claude-sonnet-4-0'
