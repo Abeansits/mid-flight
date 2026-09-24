@@ -358,7 +358,7 @@ claude_model=
 | `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
 | `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
-| `gemini_model` | `gemini-3.1-pro-preview` | Gemini model (enterprise / API-key path) |
+| `gemini_model` | `gemini-3.1-pro-preview` | Gemini Pro. Flash is `gemini-3.8-flash` |
 | `opencode_model` | unset | Leave blank for the OpenCode CLI default |
 | `opencode_variant` | `high` | e.g. `minimal`, `high`, `max`. On OpenCode v2+, appended as `#variant` only when `opencode_model` is set. A custom variant without a model is logged and skipped; the built-in `high` default is not |
 | `opencode_format` | `default` | `default` or `json` |
