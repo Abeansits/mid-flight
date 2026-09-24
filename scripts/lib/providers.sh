@@ -185,19 +185,32 @@ query_agy() {
 query_opencode() {
   local full_prompt="$1"
   local output_file="$2"
-  local args=(run --dir "$PWD")
+  local args=(run)
+  local version=""
+  local model="$opencode_model"
 
   prepare_provider_run \
     "opencode" \
     "opencode.log" \
     "Error: OpenCode query failed. Make sure the opencode CLI is installed and authenticated."
 
-  if [ -n "$opencode_model" ]; then
-    args+=(--model "$opencode_model")
+  version="$(opencode --version 2>/dev/null)" || version=""
+  if [[ "$version" =~ ^(opencode[[:space:]]+)?v?([0-9]+)\. ]] && [ "${BASH_REMATCH[2]}" -ge 2 ]; then
+    # OpenCode v2 uses the inherited cwd and encodes the variant in the model.
+    # Preserve an explicit model suffix over the default configured variant.
+    if [ -n "$model" ] && [ -n "$opencode_variant" ] && [[ "$model" != *'#'* ]]; then
+      model="${model}#${opencode_variant}"
+    fi
+  else
+    # Preserve v1 behavior if an older CLI cannot report its version.
+    args+=(--dir "$PWD")
+    if [ -n "$opencode_variant" ]; then
+      args+=(--variant "$opencode_variant")
+    fi
   fi
 
-  if [ -n "$opencode_variant" ]; then
-    args+=(--variant "$opencode_variant")
+  if [ -n "$model" ]; then
+    args+=(--model "$model")
   fi
 
   if [ -n "$opencode_format" ]; then
