@@ -335,11 +335,11 @@ Create `~/.config/mid-flight/config` to override defaults:
 
 ```
 provider=codex
-codex_model=gpt-5.4
+codex_model=gpt-6-sol
 codex_reasoning_effort=high
 agy_model=
 agy_effort=
-gemini_model=gemini-2.5-pro
+gemini_model=gemini-3.1-pro-preview
 opencode_model=
 opencode_variant=high
 opencode_format=default
@@ -354,11 +354,11 @@ claude_model=
 | Setting | Default | Description |
 |---|---|---|
 | `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude` |
-| `codex_model` | `gpt-5.4` | Codex model |
+| `codex_model` | `gpt-6-sol` | Codex model |
 | `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
 | `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
-| `gemini_model` | `gemini-2.5-pro` | Gemini model (enterprise / API-key path) |
+| `gemini_model` | `gemini-3.1-pro-preview` | Gemini model (enterprise / API-key path) |
 | `opencode_model` | unset | Leave blank for the OpenCode CLI default |
 | `opencode_variant` | `high` | e.g. `minimal`, `high`, `max`. On OpenCode v2+, appended as `#variant` only when `opencode_model` is set. A custom variant without a model is logged and skipped; the built-in `high` default is not |
 | `opencode_format` | `default` | `default` or `json` |

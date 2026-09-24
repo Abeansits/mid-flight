@@ -174,12 +174,12 @@ the rest of your home directory through so provider CLIs keep their authenticati
 Your `~/.config/mid-flight/config` is never modified.
 
 `--model` maps to the appropriate config key based on the active provider:
-- `-p codex --model gpt-5` → sets `codex_model`
-- `-p gemini --model gemini-2.5-flash` → sets `gemini_model`
+- `-p codex --model gpt-6-sol` → sets `codex_model`
+- `-p gemini --model gemini-3.1-pro-preview` → sets `gemini_model`
 - `-p agy --model gemini-3.1-pro-high` → sets `agy_model`
-- `--model gemini-2.5-flash` (no `-p`) → sets the model for whatever provider is
+- `--model gemini-3-flash-preview` (no `-p`) → sets the model for whatever provider is
   active in your config
-- `--video clip.mp4 --model gemini-2.5-flash` → sets `agy_model` and
+- `--video clip.mp4 --model gemini-3-flash-preview` → sets `agy_model` and
   `gemini_model`; video picks agy if present, else Gemini
 
 ## Exit codes
