@@ -1,10 +1,39 @@
 # MidFlight
 
-**Get a second opinion from another coding agent without leaving the one you're already in.**
+<p align="center">
+  <img src="docs/logo.png" width="160" alt="MidFlight">
+</p>
 
-You're mid-task. The approach feels right, but you want someone else to poke holes in it — or you want a precise change implemented by a different model. MidFlight sends a tight summary of the current work to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude, then brings their answer back into your session.
+<p align="center">
+  <a href="https://github.com/Abeansits/mid-flight/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Abeansits/mid-flight?style=flat-square"></a>
+  <a href="https://github.com/Abeansits/mid-flight/actions/workflows/shell-tests.yml"><img alt="Shell tests" src="https://img.shields.io/github/actions/workflow/status/Abeansits/mid-flight/shell-tests.yml?branch=main&style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/Abeansits/mid-flight?style=flat-square"></a>
+</p>
 
-No copy-paste. No rebuilding context. No switching tools.
+```text
+>be me
+>three hours into the refactor
+>agent says the design is sound
+>agent also wrote the design
+>conflict of interest detected
+>think about opening a new chat
+>paste half the repo in
+>immediately forget which file was the bug
+>scrap that plan
+>/midflight
+>a tight summary goes to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude
+>their answer comes back into the same session
+>no copy-paste
+>no second tab
+>no "certainly, let me restate your question"
+>mfw the other model finds the hole in four lines
+>or you hand it one precise change and it just does that
+>not "rewrite the app bestie"
+>you still decide
+>you just stopped letting the guy grade his own homework
+```
+
+## Usage example
 
 ```text
 /midflight should we use SSE or WebSockets for real-time updates?
@@ -54,6 +83,9 @@ You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 - [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`)
 - [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — useful as a provider from non-Claude hosts
 
+<details>
+<summary><strong>1. Claude Code plugin</strong></summary>
+
 ### 1. Claude Code plugin
 
 ```bash
@@ -70,6 +102,11 @@ Restart Claude Code, then:
 ```
 
 Claude already has the session, so it writes the context summary for you. It can also self-invoke after it is clearly stuck (multiple failed attempts, unfamiliar stack, two equally valid approaches) — and it says so when it does.
+
+</details>
+
+<details>
+<summary><strong>2. Standalone CLI</strong></summary>
 
 ### 2. Standalone CLI
 
@@ -126,6 +163,10 @@ midflight --video ./ad-v3.mp4 "does this match the storyboard?"
 
 Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).
 
+</details>
+
+<details>
+<summary><strong>3. Codex skills</strong></summary>
 
 ### 3. Codex skills
 
@@ -165,6 +206,11 @@ $midflight-check-config             # validate provider setup
 ```
 
 Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
+
+</details>
+
+<details>
+<summary><strong>4. Grok Build skills</strong></summary>
 
 ### 4. Grok Build skills
 
@@ -207,6 +253,10 @@ Restart Grok Build (or open the extensions modal with `/skills`), then:
 
 Because the host is Grok Build, MidFlight will **not** silently use `provider=grok` (circular). It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` (or pass `--allow-grok-provider`) to force Grok anyway. The default provider is often `codex`, which is already a fine external consult.
 
+</details>
+
+<details>
+<summary><strong>5. Cursor skills</strong></summary>
 
 ### 5. Cursor skills
 
@@ -254,6 +304,8 @@ Restart Cursor (or open a new Agent chat), then:
 ```
 
 There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cursor` does not apply. The default provider is often `codex`, which is a fine external consult from Cursor.
+
+</details>
 
 ## Providers
 
