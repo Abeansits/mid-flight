@@ -143,11 +143,11 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$saved" ]; then
   exit 1
 fi
 
-# A 16:9 opening frame plus --aspect 9:16 is a conflict. Stop before Grok.
 wide="$TEST_DIR/wide.png"
 tall="$TEST_DIR/tall.png"
 reported="$TEST_DIR/reported.png"
-python3 - "$wide" "$tall" "$reported" <<'PY'
+photo="$TEST_DIR/photo.png"
+python3 - "$wide" "$tall" "$reported" "$photo" <<'PY'
 import struct, sys, zlib
 
 def write_png(path, width, height):
@@ -163,6 +163,7 @@ def write_png(path, width, height):
 write_png(sys.argv[1], 16, 9)
 write_png(sys.argv[2], 9, 16)
 write_png(sys.argv[3], 400, 736)
+write_png(sys.argv[4], 3, 2)
 PY
 
 rm -f "$TEST_DIR/grok_prompt.txt"
@@ -179,6 +180,14 @@ if [ -f "$TEST_DIR/grok_prompt.txt" ]; then
   echo "FAIL: a conflicting --aspect should not call grok" >&2
   exit 1
 fi
+
+rm -f "$TEST_DIR/grok_prompt.txt"
+set +e
+err="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 16:9 --ref "$photo" 2>&1)"
+status=$?
+set -e
+assert_eq "2" "$status" "a 3:2 opening frame with --aspect 16:9 should exit 2"
+assert_contains "$err" "opening frame is 3x2" "the conflict should name a 3:2 frame"
 
 output="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 16:9 --ref "$wide" 2>"$TEST_DIR/match_err.txt")"
 if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then

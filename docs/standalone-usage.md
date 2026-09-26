@@ -68,9 +68,13 @@ midflight --video-gen PROMPT
       --diff             append `git diff` (working tree) and staged diff under Context
       --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
       --image-gen PROMPT generate one image with Grok or Codex and print the file path
-      --video-gen PROMPT generate one video with Grok and print the file path
-      --ref FILE         reference image for --image-gen or --video-gen (repeatable)
-      --aspect RATIO     1:1, 16:9, 9:16, 3:2, or 2:3
+      --video-gen PROMPT generate one video with Grok and print the file path.
+                         Asks for 720p when image_to_video lists resolution_name.
+                         The saved file can be smaller.
+      --ref FILE         reference image for --image-gen or --video-gen (repeatable).
+                         On a video, the first file is the opening frame and sets the shape.
+      --aspect RATIO     1:1, 16:9, 9:16, 3:2, or 2:3.
+                         On a video, a first --ref with a different shape is an error.
       --timeout SECONDS  hard bound on each provider call (default off; N>0 enables
                          portable watchdog + pg kill; dual ≈ 2N wall)
   -h, --help             show help
@@ -185,14 +189,24 @@ midflight -f query.md
 - **`--video-gen PROMPT`** — generates one video with Grok and prints the saved
   file path. `-p` must be `grok` when it is passed. With no `-p`, a `grok`
   config is kept; any other config uses Grok. `--video` stays analysis.
+  The prompt asks `image_to_video` for 720p when that tool lists
+  `resolution_name`. The public video API uses a different field,
+  `resolution`, and also documents `1080p`. MidFlight does not read a live
+  Grok Build schema, so a missing field or a lower tier can save a smaller
+  file. There is no `--resolution` flag.
 - **`--ref FILE`** — reference image for `--image-gen` or `--video-gen`. Repeat
   it for more than one file. On an image, the files are the edit source. On a
-  video, the first file is the opening frame. Codex also receives each file
-  with `codex exec -i`.
+  video, the first file is the opening frame and sets the shape. A portrait
+  target needs a 9:16 opening frame. A 16:9 target needs a 16:9 opening frame.
+  Later files guide the clip. They do not replace that frame. Codex also
+  receives each file with `codex exec -i`.
 - **`--aspect RATIO`** — `1:1`, `16:9`, `9:16`, `3:2`, or `2:3`. Grok gets that
   ratio on a new image. Codex image generation gets the matching pixel size
   (`16:9` is `1536x864`). A video with no `--ref` sets the ratio on the still
-  that starts the clip. One Grok `--ref` keeps that file's shape.
+  that starts the clip. With a first `--ref`, that frame's shape wins, and
+  `--aspect` is not passed to `image_to_video`. A different ratio is an error
+  before the run when the frame is a readable PNG or JPEG. An unreadable frame
+  prints a note on stderr and continues. The saved path stays on stdout.
 
 ## Provider and config overrides
 
