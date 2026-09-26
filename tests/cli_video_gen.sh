@@ -27,6 +27,8 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
 fi
 assert_eq "yes" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "video-gen grok must pass --always-approve"
+assert_eq "" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
+  "video-gen grok must not pass --sandbox read-only"
 grok_prompt="$(cat "$TEST_DIR/grok_prompt.txt")"
 assert_contains "$grok_prompt" "image_gen" \
   "a video with no reference should start by generating a still"

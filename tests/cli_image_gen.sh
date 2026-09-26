@@ -54,6 +54,8 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$fjord" ]; then
 fi
 assert_eq "yes" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "image-gen grok must pass --always-approve"
+assert_eq "" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
+  "image-gen grok must not pass --sandbox read-only"
 grok_prompt="$(cat "$TEST_DIR/grok_prompt.txt")"
 assert_contains "$grok_prompt" "image_gen" "the grok prompt should name image_gen"
 assert_contains "$grok_prompt" "a paper plane over a fjord" \

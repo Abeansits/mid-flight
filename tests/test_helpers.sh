@@ -81,15 +81,17 @@ write_gemini_stub() {
 #!/bin/bash
 set -euo pipefail
 prompt=""
+unknown=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -p) prompt="\$2"; shift 2 ;;
     -m|--include-directories) shift 2 ;;
     --output-format) shift 2 ;;
-    *) shift ;;
+    *) unknown="\${unknown}\${unknown:+ }\$1"; shift ;;
   esac
 done
 printf '%s' "\$prompt" > "$TEST_DIR/gemini_prompt.txt"
+printf '%s' "\$unknown" > "$TEST_DIR/gemini_unknown_args.txt"
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/gemini"
@@ -109,6 +111,7 @@ effort=""
 add_dir=""
 skip_permissions="no"
 output_format=""
+unknown=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -p|--print|--prompt) prompt="\$2"; shift 2 ;;
@@ -117,7 +120,7 @@ while [ \$# -gt 0 ]; do
     --add-dir) add_dir="\$2"; shift 2 ;;
     --output-format) output_format="\$2"; shift 2 ;;
     --dangerously-skip-permissions) skip_permissions="yes"; shift ;;
-    *) shift ;;
+    *) unknown="\${unknown}\${unknown:+ }\$1"; shift ;;
   esac
 done
 printf '%s' "\$prompt" > "$TEST_DIR/agy_prompt.txt"
@@ -126,6 +129,7 @@ printf '%s' "\$effort" > "$TEST_DIR/agy_effort.txt"
 printf '%s' "\$add_dir" > "$TEST_DIR/agy_add_dir.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/agy_output_format.txt"
 printf '%s' "\$skip_permissions" > "$TEST_DIR/agy_skip_permissions.txt"
+printf '%s' "\$unknown" > "$TEST_DIR/agy_unknown_args.txt"
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/agy"
@@ -145,12 +149,14 @@ model=""
 effort=""
 output_format=""
 always_approve="no"
+sandbox=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -p|--single) prompt="\$2"; shift 2 ;;
     -m|--model) model="\$2"; shift 2 ;;
     --effort) effort="\$2"; shift 2 ;;
     --output-format) output_format="\$2"; shift 2 ;;
+    --sandbox) sandbox="\$2"; shift 2 ;;
     --always-approve|--dangerously-skip-permissions|--yolo) always_approve="yes"; shift ;;
     *) shift ;;
   esac
@@ -160,6 +166,7 @@ printf '%s' "\$model" > "$TEST_DIR/grok_model.txt"
 printf '%s' "\$effort" > "$TEST_DIR/grok_effort.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/grok_output_format.txt"
 printf '%s' "\$always_approve" > "$TEST_DIR/grok_always_approve.txt"
+printf '%s' "\$sandbox" > "$TEST_DIR/grok_sandbox.txt"
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/grok"
@@ -177,11 +184,13 @@ prompt=""
 model=""
 output_format=""
 skip_permissions="no"
+permission_mode=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -p|--print) prompt="\$2"; shift 2 ;;
     --model|-m) model="\$2"; shift 2 ;;
     --output-format) output_format="\$2"; shift 2 ;;
+    --permission-mode) permission_mode="\$2"; shift 2 ;;
     --dangerously-skip-permissions) skip_permissions="yes"; shift ;;
     *) shift ;;
   esac
@@ -190,6 +199,7 @@ printf '%s' "\$prompt" > "$TEST_DIR/claude_prompt.txt"
 printf '%s' "\$model" > "$TEST_DIR/claude_model.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/claude_output_format.txt"
 printf '%s' "\$skip_permissions" > "$TEST_DIR/claude_skip_permissions.txt"
+printf '%s' "\$permission_mode" > "$TEST_DIR/claude_permission_mode.txt"
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/claude"
