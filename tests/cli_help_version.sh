@@ -13,6 +13,8 @@ assert_contains "$help_output" "--provider" "--help should list the provider fla
 assert_contains "$help_output" "--video" "--help should list the video flag"
 assert_contains "$help_output" "--image-gen" "--help should list --image-gen"
 assert_contains "$help_output" "--video-gen" "--help should list --video-gen"
+assert_contains "$help_output" "--ref" "--help should list --ref"
+assert_contains "$help_output" "--aspect" "--help should list --aspect"
 assert_contains "$help_output" "--git-status" "--help should list --git-status"
 assert_contains "$help_output" "--diff" "--help should list --diff"
 assert_contains "$help_output" "--dual" "--help should list --dual"

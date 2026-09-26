@@ -69,6 +69,8 @@ midflight --video-gen PROMPT
       --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
       --image-gen PROMPT generate one image with Grok or Codex and print the file path
       --video-gen PROMPT generate one video with Grok and print the file path
+      --ref FILE         reference image for --image-gen or --video-gen (repeatable)
+      --aspect RATIO     1:1, 16:9, 9:16, 3:2, or 2:3
       --timeout SECONDS  hard bound on each provider call (default off; N>0 enables
                          portable watchdog + pg kill; dual ≈ 2N wall)
   -h, --help             show help
@@ -160,6 +162,7 @@ midflight -p codex --image-gen "a paper plane over a fjord"
 
 # Video generation (Grok only; prints the saved file path)
 midflight --video-gen "the paper plane banks once and levels out"
+midflight --image-gen "a paper plane over a fjord" --aspect 16:9 --ref plane.png
 
 # Full back-compat: hand the engine a query file you built yourself
 midflight -f query.md
@@ -182,6 +185,13 @@ midflight -f query.md
 - **`--video-gen PROMPT`** — generates one video with Grok and prints the saved
   file path. `-p` must be `grok` when it is passed. With no `-p`, a `grok`
   config is kept; any other config uses Grok. `--video` stays analysis.
+- **`--ref FILE`** — reference image for `--image-gen` or `--video-gen`. Repeat
+  it for more than one file. On an image, the files are the edit source. On a
+  video, the first file is the opening frame. Codex also receives each file
+  with `codex exec -i`.
+- **`--aspect RATIO`** — `1:1`, `16:9`, `9:16`, `3:2`, or `2:3`. Grok gets that
+  ratio. Codex image generation gets the matching pixel size (`16:9` is
+  `1536x864`).
 
 ## Provider and config overrides
 

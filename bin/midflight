@@ -66,6 +66,8 @@ Options:
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
       --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
       --video-gen PROMPT  generate one video with Grok; prints the file path
+      --ref FILE          reference image for --image-gen or --video-gen (repeatable)
+      --aspect RATIO      1:1, 16:9, 9:16, 3:2, or 2:3 (image or video generation)
       --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
                           so provider children die too; no coreutils needed; dual ≈ 2N wall)
@@ -98,6 +100,7 @@ Examples:
   midflight --image-gen "a paper plane over a fjord"
   midflight -p codex --image-gen "a paper plane over a fjord"
   midflight --video-gen "the paper plane banks once and levels out"
+  midflight --image-gen "a paper plane over a fjord" --aspect 16:9 --ref plane.png
 
 The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
 see the project README for configuration details.
@@ -108,6 +111,7 @@ EOF
 # scalars initialized so [ -n "$VAR" ] and ${VAR} expansions never unbound.
 declare -a INCLUDES=()
 declare -a POSITIONAL=()
+declare -a REFS=()
 MODE=""
 PROVIDER=""
 DUAL_PROVIDER=""
@@ -121,6 +125,7 @@ GIT_DIFF=0
 VIDEO_SOURCE=""
 IMAGE_GEN_PROMPT=""
 VIDEO_GEN_PROMPT=""
+ASPECT=""
 TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
 # Per-section cap for --git-status / --diff output (bytes). Override with MIDFLIGHT_GIT_CONTEXT_MAX_BYTES.
 GIT_CONTEXT_MAX_BYTES="${MIDFLIGHT_GIT_CONTEXT_MAX_BYTES:-102400}"
@@ -160,6 +165,22 @@ while [ $# -gt 0 ]; do
         -*) die "--video-gen requires a prompt (got '$2')" ;;
       esac
       VIDEO_GEN_PROMPT="$2"
+      shift 2
+      ;;
+    --ref)
+      [ $# -ge 2 ] || die "--ref requires a file"
+      [ -n "$2" ] || die "--ref requires a file"
+      case "$2" in
+        -*) die "--ref requires a file (got '$2')" ;;
+      esac
+      REFS+=("$2")
+      shift 2
+      ;;
+    --aspect)
+      [ $# -ge 2 ] || die "--aspect requires a ratio"
+      [ -n "$2" ] || die "--aspect requires a ratio"
+      [ -z "$ASPECT" ] || die "--aspect was given twice"
+      ASPECT="$2"
       shift 2
       ;;
     --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
@@ -210,6 +231,43 @@ if [ "$MODE" = "image-gen" ] && [ -z "$IMAGE_GEN_PROMPT" ]; then
 fi
 if [ "$MODE" = "video-gen" ] && [ -z "$VIDEO_GEN_PROMPT" ]; then
   die "video generation requires --video-gen PROMPT"
+fi
+
+if [ -n "$ASPECT" ] || [ "${#REFS[@]}" -gt 0 ]; then
+  case "$MODE" in
+    image-gen|video-gen) ;;
+    *) die "--ref and --aspect apply only to --image-gen and --video-gen" ;;
+  esac
+fi
+
+if [ -n "$ASPECT" ]; then
+  case "$ASPECT" in
+    1:1|16:9|9:16|3:2|2:3) ;;
+    *) die "--aspect must be 1:1, 16:9, 9:16, 3:2, or 2:3 (got '$ASPECT')" ;;
+  esac
+fi
+
+# Codex image_gen takes pixels. These five match the ratios above and stay
+# on a 16px grid, which gpt-image-2 requires.
+aspect_codex_size() {
+  case "$1" in
+    1:1) printf '%s\n' "1024x1024" ;;
+    16:9) printf '%s\n' "1536x864" ;;
+    9:16) printf '%s\n' "864x1536" ;;
+    3:2) printf '%s\n' "1536x1024" ;;
+    2:3) printf '%s\n' "1024x1536" ;;
+  esac
+}
+
+if [ "${#REFS[@]}" -gt 0 ]; then
+  resolved_refs=()
+  for ref in "${REFS[@]}"; do
+    [ -f "$ref" ] || die "reference file not found: $ref"
+    ref_dir="$(cd -P "$(dirname "$ref")" && pwd)"
+    ref_base="$(basename "$ref")"
+    resolved_refs+=("$ref_dir/$ref_base")
+  done
+  REFS=("${resolved_refs[@]}")
 fi
 
 normalize_provider_name() {
@@ -661,7 +719,32 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
     die "pass the $media_noun to $media_flag, not as a separate question"
   fi
   media_prompt_file="$WORKDIR/media-prompt.md"
-  printf '%s\n' "$media_prompt" > "$media_prompt_file"
+  {
+    printf '%s\n' "$media_prompt"
+    if [ -n "$ASPECT" ]; then
+      printf '\nAspect ratio: %s\n' "$ASPECT"
+      if [ "$MODE" = "image-gen" ]; then
+        printf 'Codex size: %s\n' "$(aspect_codex_size "$ASPECT")"
+      fi
+    fi
+    if [ "${#REFS[@]}" -gt 0 ]; then
+      printf '\nReference images:\n'
+      ref_index=0
+      for ref in "${REFS[@]}"; do
+        if [ "$MODE" = "video-gen" ] && [ "$ref_index" -eq 0 ]; then
+          printf -- '- opening frame: %s\n' "$ref"
+        else
+          printf -- '- %s\n' "$ref"
+        fi
+        ref_index=$((ref_index + 1))
+      done
+    fi
+  } > "$media_prompt_file"
+  if [ "${#REFS[@]}" -gt 0 ]; then
+    refs_file="$WORKDIR/media-refs.txt"
+    printf '%s\n' "${REFS[@]}" > "$refs_file"
+    export MIDFLIGHT_REFS_FILE="$refs_file"
+  fi
   engine_args=("$media_prompt_file" "$MODE")
 elif [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
