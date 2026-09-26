@@ -57,19 +57,26 @@ Ship SSE for notifications. Keep the event payload transport-agnostic so a WebSo
 
 That outside take sits next to your current agent's analysis. You stay in the session and decide.
 
+## What you can do
+
+| | What it does | Try |
+|---|---|---|
+| 🧠 | **Second opinion.** Another model answers. Codex and Grok block project writes. Other providers follow their own permission settings. | `midflight "SSE or WebSockets?"` |
+| 🛠️ | **One precise change.** Hand it a spec. It edits that and stops. | `midflight -m implement -f request.md` |
+| 👀 | **Two models, one question.** Both answers, side by side. | `midflight --dual agy "SSE or WebSockets?"` |
+| 🎬 | **Watch a video.** A local file or a URL, via Antigravity or Gemini. | `midflight --video ./ad.mp4 "does this match the storyboard?"` |
+| 🖼️ | **Make an image.** Grok or Codex. Prints the saved file path. | `midflight --image-gen "a paper plane over a fjord"` |
+| 📎 | **Bring the repo.** Notes, source files, branch, and diff ride along. | `midflight --git-status --diff "does this look right?"` |
+
+Same engine from Claude Code, Codex, Grok Build, Cursor, or a plain terminal.
+
+In a host session, `/midflight` picks consult, implement, or video from the question. If that is unclear, it stays a consult. Image generation and a two-model consult are CLI flags.
+
+**Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
+
 ## Why this exists
 
 Coding agents are strong, and they still get stuck in their own framing. MidFlight is the cheap way to get a *different* model to look at the same problem — while you still have all the context.
-
-| You want | MidFlight does |
-|---|---|
-| A sanity check before you commit to an approach | **Consult** — advice. Codex and Grok block project writes. Other providers follow their own permission settings. |
-| A precise, spec'd change done by another model | **Implement** — reads, edits, verifies |
-| Eyes on a local file or YouTube URL | **Video** — Antigravity or Gemini multimodal analysis |
-
-You don't pick the mode. MidFlight infers it from the question. Uncertain → consult.
-
-**Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
 ## Install — five doors, same engine
 
@@ -311,15 +318,15 @@ There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cur
 
 ## Providers
 
-| Provider | Consult | Implement | Video | Model | Extra |
-|---|---|---|---|---|---|
-| `codex` | Yes | Yes | No | `codex_model` | `codex_reasoning_effort` |
-| `agy` | Yes | Yes | Yes | `agy_model` | `agy_effort` |
-| `opencode` | Yes | Yes | No | `opencode_model` | `opencode_variant`, `opencode_format` |
-| `oz` | Yes | Yes | No | `oz_model` | `oz_output_format`, `oz_profile` |
-| `gemini` | Yes | Yes | Yes | `gemini_model` | — |
-| `grok` | Yes | Yes | No | `grok_model` | `grok_effort` |
-| `claude` | Yes | Yes | No | `claude_model` | — |
+| Provider | Consult | Implement | Video | Image | Model | Extra |
+|---|---|---|---|---|---|---|
+| `codex` | Yes | Yes | No | Yes | `codex_model` | `codex_reasoning_effort` |
+| `agy` | Yes | Yes | Yes | No | `agy_model` | `agy_effort` |
+| `opencode` | Yes | Yes | No | No | `opencode_model` | `opencode_variant`, `opencode_format` |
+| `oz` | Yes | Yes | No | No | `oz_model` | `oz_output_format`, `oz_profile` |
+| `gemini` | Yes | Yes | Yes | No | `gemini_model` | — |
+| `grok` | Yes | Yes | No | Yes | `grok_model` | `grok_effort` |
+| `claude` | Yes | Yes | No | No | `claude_model` | — |
 
 `provider=antigravity` is an alias for `agy`. `provider=grok-build` is an alias for `grok`.
 
@@ -347,6 +354,8 @@ These consult paths do not get a read-only flag. Writes follow that CLI's own pe
 - Oz consult passes no permission flag. Writes follow the agent profile (`--profile` when `oz_profile` is set). The default CLI profile can read and write. `--share` shares the session. It does not sandbox the agent.
 
 Video analysis runs on Antigravity or Gemini, so it has no read-only flag either.
+
+Image generation uses your configured provider when it is `grok` or `codex`. Otherwise it picks **grok if it's on `PATH`**, else Codex. `-p grok` and `-p codex` choose directly.
 
 ### Gemini CLI status
 
