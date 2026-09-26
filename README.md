@@ -159,6 +159,7 @@ midflight --context notes.md --include "src/*.ts" "where is the leak?"
 midflight --git-status --diff "does this change look right?"
 midflight -m implement -f request.md
 midflight --video ./ad-v3.mp4 "does this match the storyboard?"
+midflight --image-gen "a paper plane over a fjord"
 ```
 
 Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).

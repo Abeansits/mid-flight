@@ -21,7 +21,7 @@ parse_args() {
   MODE="${2:-consult}"
 
   case "$MODE" in
-    consult|implement|video) ;;
+    consult|implement|video|image-gen) ;;
     *)
       log "unknown mode '$MODE', defaulting to consult"
       MODE="consult"
