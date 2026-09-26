@@ -31,6 +31,8 @@ assert_eq "sonnet" "$(cat "$TEST_DIR/claude_model.txt")" "claude should receive 
 assert_eq "text" "$(cat "$TEST_DIR/claude_output_format.txt")" "claude should request text output"
 assert_eq "no" "$(cat "$TEST_DIR/claude_skip_permissions.txt")" \
   "consult must not pass --dangerously-skip-permissions"
+assert_eq "plan" "$(cat "$TEST_DIR/claude_permission_mode.txt")" \
+  "consult claude permission mode should be plan"
 assert_contains "$(cat "$TEST_DIR/claude_prompt.txt")" \
   "You are a senior engineer being consulted mid-development." \
   "claude prompt should include the consult system prompt"

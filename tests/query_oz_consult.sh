@@ -24,6 +24,7 @@ output_format=""
 profile=""
 cwd=""
 prompt=""
+permission_args=""
 
 while [ \$# -gt 0 ]; do
   case "\$1" in
@@ -50,6 +51,10 @@ while [ \$# -gt 0 ]; do
       cwd="\$2"
       shift 2
       ;;
+    --sandbox|--permission-mode|--auto|--dangerously-skip-permissions|--approval-mode)
+      permission_args="\${permission_args}\${permission_args:+ }\$1"
+      shift
+      ;;
     *)
       shift
       ;;
@@ -57,6 +62,7 @@ while [ \$# -gt 0 ]; do
 done
 
 printf '%s' "\$model" > "$TEST_DIR/oz_model.txt"
+printf '%s' "\$permission_args" > "$TEST_DIR/oz_permission_args.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/oz_output_format.txt"
 printf '%s' "\$profile" > "$TEST_DIR/oz_profile.txt"
 printf '%s' "\$cwd" > "$TEST_DIR/oz_cwd.txt"
@@ -89,5 +95,15 @@ assert_contains "$(cat "$TEST_DIR/oz_prompt.txt")" \
 assert_contains "$(cat "$TEST_DIR/oz_prompt.txt")" \
   "Should MidFlight support more agent CLIs?" \
   "Oz prompt should include the query body"
+# The consult prompt says not to edit. That sentence is not a sandbox.
+assert_eq "" "$(cat "$TEST_DIR/oz_permission_args.txt")" \
+  "consult oz has no read-only flag to pass"
+
+output="$(run_query "$QUERY_FILE" implement)"
+assert_eq "oz-ok" "$output" "implement query should return stubbed Oz output"
+assert_eq "" "$(cat "$TEST_DIR/oz_permission_args.txt")" \
+  "implement oz must not pass a read-only flag"
+assert_eq "pairing" "$(cat "$TEST_DIR/oz_profile.txt")" \
+  "implement should still receive the configured profile"
 
 echo "PASS: consult mode routes through oz with the expected flags and prompt"
