@@ -18,7 +18,7 @@ printf 'mp4\n' > "$clip"
 write_grok_stub "$clip"
 write_codex_stub "should-not-run"
 
-output="$(run_cli --video-gen "the paper plane banks once")"
+output="$(run_cli --video-gen "the paper plane banks once" --aspect 16:9)"
 if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
   echo "FAIL: --video-gen should print the grok video path" >&2
   echo "Expected file: $clip" >&2
@@ -28,6 +28,10 @@ fi
 assert_eq "yes" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "video-gen grok must pass --always-approve"
 grok_prompt="$(cat "$TEST_DIR/grok_prompt.txt")"
+assert_contains "$grok_prompt" "image_gen" \
+  "a video with no reference should start by generating a still"
+assert_contains "$grok_prompt" "Set this ratio on the source still with image_gen" \
+  "a video with no reference should set the aspect on the still"
 assert_contains "$grok_prompt" "image_to_video" "the grok prompt should name image_to_video"
 assert_contains "$grok_prompt" "the paper plane banks once" \
   "the grok prompt should include the video description"
@@ -109,5 +113,28 @@ set -e
 assert_eq "1" "$status" "video-gen with no saved file should exit 1"
 assert_contains "$err" "did not produce a saved video file" \
   "a missing video should be explained"
+
+# Mentioning the reference image is not a saved video.
+ref="$TEST_DIR/plane.png"
+printf 'png\n' > "$ref"
+write_grok_stub "See $ref"
+set +e
+err="$(run_cli -p grok --video-gen "a paper plane banks" --ref "$ref" 2>&1)"
+status=$?
+set -e
+assert_eq "1" "$status" "naming the reference image should not count as a video"
+assert_contains "$err" "did not produce a saved video file" \
+  "a reference-only reply should be explained"
+
+# When both paths appear, keep the video.
+saved="$TEST_DIR/bank.mp4"
+printf 'mp4\n' > "$saved"
+write_grok_stub "Opened $ref then saved $saved"
+output="$(run_cli -p grok --video-gen "a paper plane banks" --ref "$ref")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$saved" ]; then
+  echo "FAIL: --video-gen should print the saved video, not the reference" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
 
 echo "PASS: --video-gen routes to grok and rejects the other modes"

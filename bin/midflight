@@ -725,6 +725,10 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
       printf '\nAspect ratio: %s\n' "$ASPECT"
       if [ "$MODE" = "image-gen" ]; then
         printf 'Codex size: %s\n' "$(aspect_codex_size "$ASPECT")"
+      elif [ "${#REFS[@]}" -gt 0 ]; then
+        printf '%s\n' "The opening frame already exists. Do not pass aspect_ratio to image_to_video."
+      else
+        printf '%s\n' "Set this ratio on the source still with image_gen. Do not pass aspect_ratio to image_to_video."
       fi
     fi
     if [ "${#REFS[@]}" -gt 0 ]; then
@@ -907,6 +911,63 @@ last_existing_path() {
   printf '%s\n' "$found"
 }
 
+is_video_file() {
+  local base
+  base="$(basename "$1")"
+  case "$base" in
+    *.mp4|*.MP4|*.mov|*.MOV|*.webm|*.WEBM|*.m4v|*.M4V|*.mkv|*.MKV) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_reference_file() {
+  local candidate="$1" ref
+  [ "${#REFS[@]}" -gt 0 ] || return 1
+  for ref in "${REFS[@]}"; do
+    if [ "$candidate" -ef "$ref" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Last saved video in the reply. A reference image the model mentions does
+# not count, even when that file exists.
+last_existing_video_path() {
+  local text="$1" i len rest candidate found=""
+  case "$text" in
+    \"*\") text="${text#\"}"; text="${text%\"}" ;;
+    \'*\') text="${text#\'}"; text="${text%\'}" ;;
+  esac
+  len=${#text}
+  i=0
+  while [ "$i" -lt "$len" ]; do
+    rest="${text:$i}"
+    case "$rest" in
+      /*)
+        candidate="$rest"
+        while [ -n "$candidate" ]; do
+          candidate="$(strip_path_punctuation "$candidate")"
+          case "$candidate" in
+            *\"|*\') candidate="${candidate%?}"; continue ;;
+          esac
+          if [ -f "$candidate" ] && is_video_file "$candidate" && ! is_reference_file "$candidate"; then
+            found="$candidate"
+            break
+          fi
+          candidate="${candidate%?}"
+        done
+        ;;
+    esac
+    i=$((i + 1))
+  done
+  if [ -n "$found" ]; then
+    resolve_existing_path "$found"
+    return 0
+  fi
+  return 1
+}
+
 # -p/--model/--config runs the engine under a temp HOME so the real config
 # stays untouched. The model sometimes prints a sentence plus a path inside
 # that temp HOME. Return the last absolute path that exists, resolved.
@@ -940,7 +1001,11 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   ec=$?
   set -e
   if [ "$ec" -eq 0 ]; then
-    resolved="$(canonicalize_image_output "$(cat "$media_out")" || true)"
+    if [ "$MODE" = "video-gen" ]; then
+      resolved="$(last_existing_video_path "$(cat "$media_out")" || true)"
+    else
+      resolved="$(canonicalize_image_output "$(cat "$media_out")" || true)"
+    fi
     if [ -n "$resolved" ] && [ -f "$resolved" ]; then
       printf '%s\n' "$resolved"
       exit 0

@@ -50,6 +50,8 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
 fi
 grok_prompt="$(cat "$TEST_DIR/grok_prompt.txt")"
 assert_contains "$grok_prompt" "Aspect ratio: 9:16" "the video prompt should name the aspect ratio"
+assert_contains "$grok_prompt" "Do not pass aspect_ratio to image_to_video" \
+  "a reference clip should not send the ratio to image_to_video"
 assert_contains "$grok_prompt" "opening frame:" "the first reference should be the opening frame"
 assert_contains "$grok_prompt" "sky.png" "the second reference should be included"
 
