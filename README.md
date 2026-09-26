@@ -160,6 +160,7 @@ midflight --git-status --diff "does this change look right?"
 midflight -m implement -f request.md
 midflight --video ./ad-v3.mp4 "does this match the storyboard?"
 midflight --image-gen "a paper plane over a fjord"
+midflight --video-gen "the paper plane banks once and levels out"
 ```
 
 Full flag reference: [docs/standalone-usage.md](docs/standalone-usage.md).
@@ -324,7 +325,9 @@ There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cur
 
 From Claude Code, prefer a non-`claude` provider — `provider=claude` is circular on that host (same harness consulting itself).
 
-Video uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
+Video analysis uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
+
+Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config uses Grok when that CLI is on `PATH`. `-p` must be `grok`.
 
 ### Gemini CLI status
 

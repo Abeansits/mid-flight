@@ -59,6 +59,7 @@ while [ \$# -gt 0 ]; do
   case "\$1" in
     -o|--output-last-message) output_file="\$2"; shift 2 ;;
     --sandbox) sandbox="\$2"; shift 2 ;;
+    -i|--image) printf '%s\n' "\$2" >> "$TEST_DIR/codex_images.txt"; shift 2 ;;
     --model|-c) shift 2 ;;
     --skip-git-repo-check) shift ;;
     *) prompt="\$1"; shift ;;

@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "On-demand consultation with Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude at any point during development",
-    "version": "1.16.0"
+    "version": "1.17.0"
   },
   "plugins": [{
     "name": "mid-flight",

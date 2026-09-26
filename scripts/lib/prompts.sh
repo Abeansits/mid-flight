@@ -20,6 +20,7 @@ load_system_prompt() {
     implement) read_prompt_file "implement.md" ;;
     video) read_prompt_file "video.md" ;;
     image-gen) read_prompt_file "image-gen.md" ;;
+    video-gen) read_prompt_file "video-gen.md" ;;
     *) read_prompt_file "consult.md" ;;
   esac
 }

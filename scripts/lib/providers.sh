@@ -100,6 +100,8 @@ query_codex() {
   local full_prompt="$1"
   local output_file="$2"
   local sandbox_mode="read-only"
+  local ref_path=""
+  local image_args=()
 
   prepare_provider_run \
     "codex" \
@@ -113,11 +115,20 @@ query_codex() {
     sandbox_mode="workspace-write"
   fi
 
+  if [ "${MODE:-}" = "image-gen" ] && [ -n "${MIDFLIGHT_REFS_FILE:-}" ] && [ -f "$MIDFLIGHT_REFS_FILE" ]; then
+    while IFS= read -r ref_path || [ -n "$ref_path" ]; do
+      [ -n "$ref_path" ] || continue
+      image_args+=(-i "$ref_path")
+    done < "$MIDFLIGHT_REFS_FILE"
+  fi
+
+  # ${image_args[@]+...} keeps bash 3.2 set -u happy when there are no refs.
   codex exec \
     --model "$codex_model" \
     -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
     --sandbox "$sandbox_mode" \
     --skip-git-repo-check \
+    ${image_args[@]+"${image_args[@]}"} \
     -o "$output_file" \
     "$full_prompt" \
     > "$PROVIDER_LOG_FILE" \
@@ -270,9 +281,9 @@ query_grok() {
     args+=(--effort "$grok_effort")
   fi
 
-  # Consult/video stay gated. Implement edits files, and image-gen calls
-  # the Imagine tool, so both must auto-approve in a non-interactive run.
-  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ]; then
+  # Consult and video analysis stay gated. Implement edits files.
+  # Image and video generation call Imagine, so they must auto-approve.
+  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ] || [ "${MODE:-}" = "video-gen" ]; then
     args+=(--always-approve)
   fi
 
