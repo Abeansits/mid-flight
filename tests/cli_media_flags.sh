@@ -42,7 +42,17 @@ clip="$TEST_DIR/clip.mp4"
 printf 'mp4\n' > "$clip"
 write_grok_stub "$clip"
 
+set +e
 output="$(run_cli --video-gen "the plane banks once" --aspect 9:16 --ref "$ref" --ref "$second" 2>"$TEST_DIR/video_err.txt")"
+status=$?
+set -e
+if [ "$status" -ne 0 ]; then
+  echo "FAIL: --video-gen with refs should exit 0" >&2
+  echo "Status: $status" >&2
+  echo "Stdout: $output" >&2
+  cat "$TEST_DIR/video_err.txt" >&2
+  exit 1
+fi
 if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
   echo "FAIL: --video-gen with refs should print the saved video" >&2
   echo "Actual: $output" >&2
@@ -63,8 +73,8 @@ assert_contains "$grok_prompt" "Later reference images guide the clip" \
 assert_contains "$grok_prompt" "They do not replace the opening frame" \
   "later references should not replace the opening frame"
 assert_contains "$grok_prompt" "sky.png" "the second reference should be included"
-frame_at="$(printf '%s\n' "$grok_prompt" | grep -n "opening frame: " | head -1 | cut -d: -f1)"
-guide_at="$(printf '%s\n' "$grok_prompt" | grep -n -- "- $second" | head -1 | cut -d: -f1)"
+frame_at="$(awk -v needle="opening frame: " 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
+guide_at="$(awk -v needle="- $second" 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
 if [ -z "$frame_at" ] || [ -z "$guide_at" ] || [ "$frame_at" -ge "$guide_at" ]; then
   echo "FAIL: the opening frame should be listed before later references" >&2
   echo "opening frame line: ${frame_at:-missing}" >&2
