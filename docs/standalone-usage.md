@@ -190,8 +190,8 @@ midflight -f query.md
   video, the first file is the opening frame. Codex also receives each file
   with `codex exec -i`.
 - **`--aspect RATIO`** — `1:1`, `16:9`, `9:16`, `3:2`, or `2:3`. Grok gets that
-  ratio. Codex image generation gets the matching pixel size (`16:9` is
-  `1536x864`).
+  ratio on a new image or a video. Codex image generation gets the matching
+  pixel size (`16:9` is `1536x864`). One Grok `--ref` keeps that file's shape.
 
 ## Provider and config overrides
 
