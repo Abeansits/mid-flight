@@ -73,8 +73,11 @@ assert_contains "$grok_prompt" "Later reference images guide the clip" \
 assert_contains "$grok_prompt" "They do not replace the opening frame" \
   "later references should not replace the opening frame"
 assert_contains "$grok_prompt" "sky.png" "the second reference should be included"
+# MidFlight lists refs after `cd -P`, so the prompt path is the physical
+# path. On macOS, mktemp lives under /var, which is a symlink to /private/var.
+second_listed="$(cd -P "$(dirname "$second")" && pwd)/$(basename "$second")"
 frame_at="$(awk -v needle="opening frame: " 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
-guide_at="$(awk -v needle="- $second" 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
+guide_at="$(awk -v needle="$second_listed" 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
 if [ -z "$frame_at" ] || [ -z "$guide_at" ] || [ "$frame_at" -ge "$guide_at" ]; then
   echo "FAIL: the opening frame should be listed before later references" >&2
   echo "opening frame line: ${frame_at:-missing}" >&2
