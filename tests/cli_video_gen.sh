@@ -126,6 +126,24 @@ assert_eq "1" "$status" "naming the reference image should not count as a video"
 assert_contains "$err" "did not produce a saved video file" \
   "a reference-only reply should be explained"
 
+# Naming a video this run did not write is not success.
+stale_vid="$TEST_DIR/already-there.mp4"
+printf 'stale\n' > "$stale_vid"
+cat > "$TEST_DIR/bin/grok" <<EOF
+#!/bin/bash
+set -euo pipefail
+printf 'Saved at "%s".\n' "$stale_vid"
+EOF
+chmod +x "$TEST_DIR/bin/grok"
+set +e
+err="$(run_cli -p grok --video-gen "a paper plane banks" 2>&1)"
+status=$?
+set -e
+assert_eq "1" "$status" "naming a pre-existing video should exit 1"
+assert_contains "$err" "did not produce a saved video file" \
+  "a pre-existing video should be explained"
+assert_eq "stale" "$(cat "$stale_vid")" "the pre-existing video should stay untouched"
+
 # When both paths appear, keep the video.
 saved="$TEST_DIR/bank.mp4"
 printf 'mp4\n' > "$saved"
