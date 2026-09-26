@@ -77,7 +77,9 @@ midflight --video-gen PROMPT
   -V, --version          show version
 ```
 
-Modes for Codex: consult (and video, if Codex were ever selected) pass `--sandbox read-only`; `-m implement` and `--image-gen` pass `--sandbox workspace-write`. Other providers already gate write permissions by mode (agy/claude skip-permissions, grok `--always-approve` for implement, `--image-gen`, and `--video-gen`).
+Consult passes a read-only flag only when that CLI has one MidFlight can trust for a single run. Codex uses `--sandbox read-only`. Grok uses `--sandbox read-only`. Project writes are blocked, and `~/.grok` and temp stay writable. Claude uses `--permission-mode plan`. Implement uses Codex `--sandbox workspace-write`, Grok `--always-approve` with the sandbox left off, and `--dangerously-skip-permissions` for Antigravity and Claude. Image generation and video generation stay writable.
+
+Antigravity, Gemini, OpenCode, and Oz consults do not get a read-only flag. Antigravity headless mode auto-allows workspace file writes even when `--dangerously-skip-permissions` is omitted. For those providers the consult prompt is an instruction, and writes follow that CLI's permission settings. Limits are in the README section [Consult and file writes](../README.md#consult-and-file-writes).
 
 ### Dual-consult
 

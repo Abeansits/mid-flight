@@ -63,11 +63,11 @@ Coding agents are strong, and they still get stuck in their own framing. MidFlig
 
 | You want | MidFlight does |
 |---|---|
-| A sanity check before you commit to an approach | **Consult** — advice only, no file changes |
+| A sanity check before you commit to an approach | **Consult** — advice. Codex and Grok block project writes. Other providers follow their own permission settings. |
 | A precise, spec'd change done by another model | **Implement** — reads, edits, verifies |
 | Eyes on a local file or YouTube URL | **Video** — Antigravity or Gemini multimodal analysis |
 
-You don't pick the mode. MidFlight infers it from the question. Uncertain → consult (safe by default).
+You don't pick the mode. MidFlight infers it from the question. Uncertain → consult.
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
@@ -329,6 +329,25 @@ Video analysis uses your configured Google provider if it is `agy` or `gemini`. 
 
 Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config uses Grok when that CLI is on `PATH`. `-p` must be `grok`.
 
+### Consult and file writes
+
+`prompts/consult.md` tells the model not to edit files. That line is an instruction. MidFlight also passes a read-only flag when the provider CLI has one it can trust.
+
+Codex consult passes `--sandbox read-only`. Implement and image generation pass `--sandbox workspace-write`. The sandbox covers model-generated shell and tool writes. Codex still writes session files under `$CODEX_HOME`. Video analysis does not select Codex. `query_codex` still passes `--sandbox read-only` for every mode except implement and image generation.
+
+Grok consult passes `--sandbox read-only`. That profile still writes `~/.grok` and temp directories. An enterprise `requirements.toml` pin can override the CLI flag. Implement, image generation, and video generation pass `--always-approve` and leave the sandbox off so those modes can write.
+
+Claude consult passes `--permission-mode plan`. Claude Code documents plan mode as reading and exploring without editing source. Shell commands can still run, and accepting a plan leaves plan mode. This is not a kernel sandbox. Implement passes `--dangerously-skip-permissions` and does not pass plan mode.
+
+These consult paths do not get a read-only flag. Writes follow that CLI's own permission settings.
+
+- Antigravity consult omits `--dangerously-skip-permissions`. Headless mode still auto-allows workspace file reads and writes. Commands, web, and files outside the workspace are soft-denied. Implement passes `--dangerously-skip-permissions`.
+- Gemini consult passes no approval mode. `--approval-mode=plan` is documented as read-only, and headless plan mode switches to YOLO when the plan exits, so MidFlight does not pass it.
+- OpenCode consult passes no permission flag. `edit` defaults to allow. `opencode run --auto` approves permissions that are not denied. `OPENCODE_PERMISSION` is merged with user config, so it is not a lock.
+- Oz consult passes no permission flag. Writes follow the agent profile (`--profile` when `oz_profile` is set). The default CLI profile can read and write. `--share` shares the session. It does not sandbox the agent.
+
+Video analysis runs on Antigravity or Gemini, so it has no read-only flag either.
+
 ### Gemini CLI status
 
 On 18 June 2026, Google stopped serving **consumer** Gemini CLI requests (free, AI Pro, AI Ultra). Use `provider=agy` ([install](https://antigravity.google/docs/cli/install)). Keep `provider=gemini` only if you have an enterprise Code Assist license or a paid Gemini API key.
@@ -451,7 +470,7 @@ MidFlight is a thin router over other agents' CLIs.
 
 Each invocation gets its own temp run workspace for staged inputs, prompt assembly, provider logs, and response capture. Stdin is detached before launching provider CLIs so a caller with an open pipe cannot deadlock Codex.
 
-Codex sandbox is mode-scoped: consult/video use `--sandbox read-only`; implement uses `--sandbox workspace-write` so edits can land. The sandbox only restricts model-generated shell/tool writes — Codex still persists its own session state under `$CODEX_HOME`.
+Consult write limits are per provider. Codex and Grok can block project writes. Claude consult uses plan mode. Antigravity, Gemini, OpenCode, and Oz follow their own permission settings. See [Consult and file writes](#consult-and-file-writes).
 
 Video mode copies local files into a staging dir. Gemini gets `@path` plus `--include-directories`. Antigravity gets `--add-dir` and a plain path in the prompt (no `@path` syntax). URLs go in the prompt as-is. Gemini's 20MB inline-file limit is checked up front.
 

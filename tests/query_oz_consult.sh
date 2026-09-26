@@ -95,7 +95,6 @@ assert_contains "$(cat "$TEST_DIR/oz_prompt.txt")" \
 assert_contains "$(cat "$TEST_DIR/oz_prompt.txt")" \
   "Should MidFlight support more agent CLIs?" \
   "Oz prompt should include the query body"
-# The consult prompt says not to edit. That sentence is not a sandbox.
 assert_eq "" "$(cat "$TEST_DIR/oz_permission_args.txt")" \
   "consult oz has no read-only flag to pass"
 

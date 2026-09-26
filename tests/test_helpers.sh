@@ -72,8 +72,6 @@ EOF
   chmod +x "$TEST_DIR/bin/codex"
 }
 
-# Stub the gemini CLI: capture the prompt to $TEST_DIR/gemini_prompt.txt and
-# write a canned response to stdout. Optional arg overrides the response text.
 write_gemini_stub() {
   local response="${1:-stub-gemini-ok}"
 

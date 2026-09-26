@@ -102,7 +102,6 @@ assert_contains "$(cat "$TEST_DIR/opencode_prompt.txt")" \
 assert_contains "$(cat "$TEST_DIR/opencode_prompt.txt")" \
   "Should MidFlight share one provider contract?" \
   "OpenCode prompt should include the query body"
-# The consult prompt says not to edit. That sentence is not a sandbox.
 assert_eq "no" "$(cat "$TEST_DIR/opencode_auto.txt")" \
   "consult must not pass --auto"
 assert_eq "" "$(cat "$TEST_DIR/opencode_permission_env.txt")" \
@@ -111,7 +110,7 @@ assert_eq "" "$(cat "$TEST_DIR/opencode_permission_env.txt")" \
 output="$(run_query "$QUERY_FILE" implement)"
 assert_eq "opencode-ok" "$output" "implement query should return stubbed OpenCode output"
 assert_eq "no" "$(cat "$TEST_DIR/opencode_auto.txt")" \
-  "implement must not pass a permission deny"
+  "implement must not pass --auto"
 assert_eq "" "$(cat "$TEST_DIR/opencode_permission_env.txt")" \
   "implement must not set OPENCODE_PERMISSION"
 assert_eq "anthropic/claude-sonnet-4-0" "$(cat "$TEST_DIR/opencode_model.txt")" \
