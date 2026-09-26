@@ -66,11 +66,12 @@ That outside take sits next to your current agent's analysis. You stay in the se
 | 👀 | **Two models, one question.** Both answers, side by side. | `midflight --dual agy "SSE or WebSockets?"` |
 | 🎬 | **Watch a video.** A local file or a URL, via Antigravity or Gemini. | `midflight --video ./ad.mp4 "does this match the storyboard?"` |
 | 🖼️ | **Make an image.** Grok or Codex. Prints the saved file path. | `midflight --image-gen "a paper plane over a fjord"` |
+| 🎥 | **Make a video.** Grok only. Prints the saved file path. | `midflight --video-gen "the paper plane banks once and levels out"` |
 | 📎 | **Bring the repo.** Notes, source files, branch, and diff ride along. | `midflight --git-status --diff "does this look right?"` |
 
 Same engine from Claude Code, Codex, Grok Build, Cursor, or a plain terminal.
 
-In a host session, `/midflight` picks consult, implement, or video from the question. If that is unclear, it stays a consult. Image generation and a two-model consult are CLI flags.
+In a host session, `/midflight` picks consult, implement, or video from the question. Codex uses `$midflight`. If that is unclear, it stays a consult. Image generation, video generation, and a two-model consult are CLI flags.
 
 **Not for:** replacing your main agent, dumping a whole project with no scope, or background/hook-based review. If you can't name the question, don't invoke it.
 
