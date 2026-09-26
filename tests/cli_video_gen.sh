@@ -33,6 +33,12 @@ assert_contains "$grok_prompt" "image_gen" \
 assert_contains "$grok_prompt" "Set this ratio on the source still with image_gen" \
   "a video with no reference should set the aspect on the still"
 assert_contains "$grok_prompt" "image_to_video" "the grok prompt should name image_to_video"
+assert_contains "$grok_prompt" "720p" \
+  "a video with no reference should request 720p"
+assert_contains "$grok_prompt" "resolution_name" \
+  "the 720p request should use resolution_name when that field is listed"
+assert_contains "$grok_prompt" "Do not describe the file as HD" \
+  "a smaller or unsupported result should not be called HD"
 assert_contains "$grok_prompt" "the paper plane banks once" \
   "the grok prompt should include the video description"
 if [ -f "$TEST_DIR/codex_prompt.txt" ]; then
@@ -136,5 +142,106 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$saved" ]; then
   echo "Actual: $output" >&2
   exit 1
 fi
+
+# A 16:9 opening frame plus --aspect 9:16 is a conflict. Stop before Grok.
+wide="$TEST_DIR/wide.png"
+tall="$TEST_DIR/tall.png"
+reported="$TEST_DIR/reported.png"
+python3 - "$wide" "$tall" "$reported" <<'PY'
+import struct, sys, zlib
+
+def write_png(path, width, height):
+    raw = b"".join(b"\x00" + (b"\x00" * (width * 3)) for _ in range(height))
+    def chunk(tag, data):
+        crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", crc)
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    blob = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+    with open(path, "wb") as handle:
+        handle.write(blob)
+
+write_png(sys.argv[1], 16, 9)
+write_png(sys.argv[2], 9, 16)
+write_png(sys.argv[3], 400, 736)
+PY
+
+rm -f "$TEST_DIR/grok_prompt.txt"
+write_grok_stub "$clip"
+set +e
+err="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 9:16 --ref "$wide" 2>&1)"
+status=$?
+set -e
+assert_eq "2" "$status" "a 16:9 opening frame with --aspect 9:16 should exit 2"
+assert_contains "$err" "opening frame is 16x9" "the conflict should name the opening frame size"
+assert_contains "$err" "--aspect is 9:16" "the conflict should name the requested ratio"
+assert_contains "$err" "first --ref" "the conflict should say the first reference sets the shape"
+if [ -f "$TEST_DIR/grok_prompt.txt" ]; then
+  echo "FAIL: a conflicting --aspect should not call grok" >&2
+  exit 1
+fi
+
+output="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 16:9 --ref "$wide" 2>"$TEST_DIR/match_err.txt")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
+  echo "FAIL: a matching opening frame should still print the saved video" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+if [[ "$output" == *"midflight:"* ]]; then
+  echo "FAIL: a matching opening frame should keep diagnostics off stdout" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+match_err="$(cat "$TEST_DIR/match_err.txt")"
+if [[ "$match_err" == *"but --aspect"* ]]; then
+  echo "FAIL: a matching opening frame should not warn about --aspect" >&2
+  echo "Actual: $match_err" >&2
+  exit 1
+fi
+
+output="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 9:16 --ref "$tall" 2>"$TEST_DIR/tall_err.txt")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
+  echo "FAIL: a 9:16 opening frame with --aspect 9:16 should print the saved video" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+tall_err="$(cat "$TEST_DIR/tall_err.txt")"
+if [[ "$tall_err" == *"but --aspect"* ]]; then
+  echo "FAIL: a matching portrait frame should not warn about --aspect" >&2
+  exit 1
+fi
+
+output="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 9:16 --ref "$reported" 2>"$TEST_DIR/reported_err.txt")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
+  echo "FAIL: a 400x736 opening frame should count as 9:16" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+reported_err="$(cat "$TEST_DIR/reported_err.txt")"
+if [[ "$reported_err" == *"but --aspect"* ]]; then
+  echo "FAIL: 400x736 should not conflict with --aspect 9:16" >&2
+  echo "Actual: $reported_err" >&2
+  exit 1
+fi
+
+plain="$TEST_DIR/not-an-image.png"
+printf 'not a png\n' > "$plain"
+output="$(run_cli -p grok --video-gen "a paper plane banks" --aspect 16:9 --ref "$plain" 2>"$TEST_DIR/unread_err.txt")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
+  echo "FAIL: an unreadable opening frame should still print the saved video" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+if [[ "$output" == *"could not read"* ]]; then
+  echo "FAIL: the unreadable-frame note should stay on stderr" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+unread_err="$(cat "$TEST_DIR/unread_err.txt")"
+assert_contains "$unread_err" "could not read the size" \
+  "an unreadable opening frame should say the size was not read"
+assert_contains "$unread_err" "not applied" \
+  "an unreadable opening frame should say --aspect is not applied"
+assert_contains "$unread_err" "first --ref" \
+  "an unreadable opening frame should say the first reference sets the shape"
 
 echo "PASS: --video-gen routes to grok and rejects the other modes"
