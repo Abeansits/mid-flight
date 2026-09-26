@@ -270,9 +270,9 @@ query_grok() {
     args+=(--effort "$grok_effort")
   fi
 
-  # Consult/video stay gated. Implement edits files, and image-gen calls
-  # the Imagine tool, so both must auto-approve in a non-interactive run.
-  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ]; then
+  # Consult and video analysis stay gated. Implement edits files.
+  # Image and video generation call Imagine, so they must auto-approve.
+  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ] || [ "${MODE:-}" = "video-gen" ]; then
     args+=(--always-approve)
   fi
 

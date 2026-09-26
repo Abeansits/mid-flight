@@ -48,6 +48,7 @@ Usage:
   midflight [OPTIONS] [QUESTION...]
   midflight --video FILE|URL [QUESTION...]
   midflight --image-gen PROMPT
+  midflight --video-gen PROMPT
   midflight -f QUERY_FILE [OPTIONS]
 
 Options:
@@ -64,6 +65,7 @@ Options:
       --diff              append git diff (working tree) and staged diff under Context
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
       --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
+      --video-gen PROMPT  generate one video with Grok; prints the file path
       --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
                           so provider children die too; no coreutils needed; dual ≈ 2N wall)
@@ -95,6 +97,7 @@ Examples:
   midflight --video ./ad.mp4 "does this match the storyboard?"
   midflight --image-gen "a paper plane over a fjord"
   midflight -p codex --image-gen "a paper plane over a fjord"
+  midflight --video-gen "the paper plane banks once and levels out"
 
 The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
 see the project README for configuration details.
@@ -117,6 +120,7 @@ GIT_STATUS=0
 GIT_DIFF=0
 VIDEO_SOURCE=""
 IMAGE_GEN_PROMPT=""
+VIDEO_GEN_PROMPT=""
 TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
 # Per-section cap for --git-status / --diff output (bytes). Override with MIDFLIGHT_GIT_CONTEXT_MAX_BYTES.
 GIT_CONTEXT_MAX_BYTES="${MIDFLIGHT_GIT_CONTEXT_MAX_BYTES:-102400}"
@@ -149,6 +153,15 @@ while [ $# -gt 0 ]; do
       IMAGE_GEN_PROMPT="$2"
       shift 2
       ;;
+    --video-gen)
+      [ $# -ge 2 ] || die "--video-gen requires a prompt"
+      [ -n "$2" ] || die "--video-gen requires a prompt"
+      case "$2" in
+        -*) die "--video-gen requires a prompt (got '$2')" ;;
+      esac
+      VIDEO_GEN_PROMPT="$2"
+      shift 2
+      ;;
     --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help)       usage; exit 0 ;;
     -V|--version)    version; exit 0 ;;
@@ -169,17 +182,34 @@ if [ -n "$IMAGE_GEN_PROMPT" ]; then
   MODE="image-gen"
 fi
 
+# --video-gen generates a clip. --video analyzes a file.
+if [ -n "$VIDEO_GEN_PROMPT" ] && [ -n "$IMAGE_GEN_PROMPT" ]; then
+  die "--video-gen cannot be combined with --image-gen"
+fi
+if [ -n "$VIDEO_GEN_PROMPT" ] && [ -n "$VIDEO_SOURCE" ]; then
+  die "--video-gen cannot be combined with --video"
+fi
+if [ -n "$VIDEO_GEN_PROMPT" ] && [ -n "$MODE" ]; then
+  die "--video-gen cannot be combined with -m/--mode"
+fi
+if [ -n "$VIDEO_GEN_PROMPT" ]; then
+  MODE="video-gen"
+fi
+
 # --video implies video mode; otherwise default to consult.
 [ -n "$VIDEO_SOURCE" ] && MODE="video"
 [ -z "$MODE" ] && MODE="consult"
 
 case "$MODE" in
-  consult|implement|video|image-gen) ;;
+  consult|implement|video|image-gen|video-gen) ;;
   *) die "invalid mode '$MODE' (expected consult, implement, or video)" ;;
 esac
 
 if [ "$MODE" = "image-gen" ] && [ -z "$IMAGE_GEN_PROMPT" ]; then
   die "image generation requires --image-gen PROMPT"
+fi
+if [ "$MODE" = "video-gen" ] && [ -z "$VIDEO_GEN_PROMPT" ]; then
+  die "video generation requires --video-gen PROMPT"
 fi
 
 normalize_provider_name() {
@@ -195,6 +225,14 @@ if [ "$MODE" = "image-gen" ] && [ -n "$PROVIDER" ]; then
   case "$PROVIDER" in
     codex|grok) ;;
     *) die "--image-gen supports codex and grok (got '$PROVIDER')" ;;
+  esac
+fi
+
+if [ "$MODE" = "video-gen" ] && [ -n "$PROVIDER" ]; then
+  PROVIDER="$(normalize_provider_name "$PROVIDER")"
+  case "$PROVIDER" in
+    grok) ;;
+    *) die "--video-gen supports grok (got '$PROVIDER')" ;;
   esac
 fi
 
@@ -366,6 +404,7 @@ build_config_home() {
     local effective_provider="$PROVIDER"
     local write_google_models="false"
     local write_image_models="false"
+    local write_video_model="false"
 
     if [ "$MODE" = "video" ]; then
       case "$effective_provider" in
@@ -388,6 +427,12 @@ build_config_home() {
         *) write_image_models="true" ;;
       esac
     fi
+    if [ "$MODE" = "video-gen" ]; then
+      case "$effective_provider" in
+        grok|grok-build) ;;
+        *) write_video_model="true" ;;
+      esac
+    fi
 
     write_model_key() {
       local key="$1"
@@ -402,6 +447,8 @@ build_config_home() {
     elif [ "$write_image_models" = "true" ]; then
       write_model_key "grok_model"
       write_model_key "codex_model"
+    elif [ "$write_video_model" = "true" ]; then
+      write_model_key "grok_model"
     else
       local model_key=""
       case "$effective_provider" in
@@ -596,17 +643,26 @@ run_engine() {
 
 # Determine engine arguments by mode.
 declare -a engine_args
-if [ "$MODE" = "image-gen" ]; then
-  [ -z "$QUERY_FILE" ] || die "--image-gen cannot be combined with --query-file"
+if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
+  if [ "$MODE" = "image-gen" ]; then
+    media_flag="--image-gen"
+    media_prompt="$IMAGE_GEN_PROMPT"
+    media_noun="image description"
+  else
+    media_flag="--video-gen"
+    media_prompt="$VIDEO_GEN_PROMPT"
+    media_noun="video description"
+  fi
+  [ -z "$QUERY_FILE" ] || die "$media_flag cannot be combined with --query-file"
   if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] || have_git_flags; then
-    die "--context/--include/--git-status/--diff do not apply to --image-gen"
+    die "--context/--include/--git-status/--diff do not apply to $media_flag"
   fi
   if [ -n "$QUESTION" ]; then
-    die "pass the image description to --image-gen, not as a separate question"
+    die "pass the $media_noun to $media_flag, not as a separate question"
   fi
-  image_prompt_file="$WORKDIR/image-prompt.md"
-  printf '%s\n' "$IMAGE_GEN_PROMPT" > "$image_prompt_file"
-  engine_args=("$image_prompt_file" "image-gen")
+  media_prompt_file="$WORKDIR/media-prompt.md"
+  printf '%s\n' "$media_prompt" > "$media_prompt_file"
+  engine_args=("$media_prompt_file" "$MODE")
 elif [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
   [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
@@ -788,31 +844,35 @@ canonicalize_image_output() {
   return 1
 }
 
-if [ "$MODE" = "image-gen" ]; then
-  image_out="$WORKDIR/image-gen.out"
+if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
+  media_out="$WORKDIR/media-gen.out"
   set +e
   if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
     CONFIG_HOME=""
     build_config_home
-    HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$image_out"
+    HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   else
-    run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$image_out"
+    run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   fi
   ec=$?
   set -e
   if [ "$ec" -eq 0 ]; then
-    resolved="$(canonicalize_image_output "$(cat "$image_out")" || true)"
+    resolved="$(canonicalize_image_output "$(cat "$media_out")" || true)"
     if [ -n "$resolved" ] && [ -f "$resolved" ]; then
       printf '%s\n' "$resolved"
       exit 0
     fi
-    printf 'midflight: image-gen did not produce a saved image file\n' >&2
-    if [ -s "$image_out" ]; then
-      cat "$image_out" >&2
+    if [ "$MODE" = "video-gen" ]; then
+      printf 'midflight: video-gen did not produce a saved video file\n' >&2
+    else
+      printf 'midflight: image-gen did not produce a saved image file\n' >&2
+    fi
+    if [ -s "$media_out" ]; then
+      cat "$media_out" >&2
     fi
     exit 1
   fi
-  cat "$image_out"
+  cat "$media_out"
   exit "$ec"
 fi
 

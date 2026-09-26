@@ -233,6 +233,18 @@ validate_config_state() {
 resolve_provider_for_mode() {
   local mode="$1"
 
+  if [ "$mode" = "video-gen" ]; then
+    case "$provider" in
+      grok)
+        return
+        ;;
+    esac
+
+    log "video-gen: overriding provider=$provider -> grok"
+    provider="grok"
+    return
+  fi
+
   if [ "$mode" = "image-gen" ]; then
     case "$provider" in
       grok|codex)
