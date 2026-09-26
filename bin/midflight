@@ -65,9 +65,13 @@ Options:
       --diff              append git diff (working tree) and staged diff under Context
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
       --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
-      --video-gen PROMPT  generate one video with Grok; prints the file path
-      --ref FILE          reference image for --image-gen or --video-gen (repeatable)
-      --aspect RATIO      1:1, 16:9, 9:16, 3:2, or 2:3 (image or video generation)
+      --video-gen PROMPT  generate one video with Grok; prints the file path.
+                          Asks for 720p when image_to_video lists resolution_name.
+                          The saved file can be smaller.
+      --ref FILE          reference image for --image-gen or --video-gen (repeatable).
+                          On a video, the first file is the opening frame and sets the shape.
+      --aspect RATIO      1:1, 16:9, 9:16, 3:2, or 2:3.
+                          On a video, a first --ref with a different shape is an error.
       --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
                           so provider children die too; no coreutils needed; dual ≈ 2N wall)
@@ -268,6 +272,109 @@ if [ "${#REFS[@]}" -gt 0 ]; then
     resolved_refs+=("$ref_dir/$ref_base")
   done
   REFS=("${resolved_refs[@]}")
+fi
+
+require_opening_frame_aspect() {
+  local path="$1"
+  local ratio="$2"
+  local pixels=""
+  local width=""
+  local height=""
+  local aw=""
+  local ah=""
+  local diff=0
+  local tolerance_percent=4
+  local py_status=0
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf 'midflight: could not read the size of opening frame %s. python3 is not available. --aspect %s is not applied. The first --ref sets the video shape.\n' \
+      "$path" "$ratio" >&2
+    return 0
+  fi
+
+  # bash 3.2 on macOS can exit the whole script when a command substitution
+  # fails under set -e, even inside if. Capture the status with set +e.
+  set +e
+  pixels="$(python3 - "$path" <<'PY'
+import struct
+import sys
+
+path = sys.argv[1]
+with open(path, "rb") as handle:
+    data = handle.read()
+
+def png_size(blob):
+    if len(blob) < 24 or blob[:8] != b"\x89PNG\r\n\x1a\n" or blob[12:16] != b"IHDR":
+        return None
+    return struct.unpack(">II", blob[16:24])
+
+def jpeg_size(blob):
+    if len(blob) < 4 or blob[:2] != b"\xff\xd8":
+        return None
+    index = 2
+    limit = len(blob)
+    while index + 8 < limit:
+        if blob[index] != 0xFF:
+            return None
+        while index < limit and blob[index] == 0xFF:
+            index += 1
+        if index >= limit:
+            return None
+        marker = blob[index]
+        index += 1
+        if marker in (0x01, 0xD9) or 0xD0 <= marker <= 0xD7:
+            continue
+        if marker == 0xDA:
+            return None
+        if index + 2 > limit:
+            return None
+        segment = struct.unpack(">H", blob[index:index + 2])[0]
+        if segment < 2:
+            return None
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+            if index + 7 > limit:
+                return None
+            height, width = struct.unpack(">HH", blob[index + 3:index + 7])
+            return width, height
+        index += segment
+    return None
+
+size = png_size(data) or jpeg_size(data)
+if not size or size[0] <= 0 or size[1] <= 0:
+    sys.exit(1)
+print("%d %d" % (size[0], size[1]))
+PY
+)"
+  py_status=$?
+  set -e
+  read -r width height <<<"$pixels" || true
+  case "$width" in
+    ''|*[!0-9]*) width="" ;;
+    0) width="" ;;
+  esac
+  case "$height" in
+    ''|*[!0-9]*) height="" ;;
+    0) height="" ;;
+  esac
+  if [ "$py_status" -ne 0 ] || [ -z "$width" ] || [ -z "$height" ]; then
+    printf 'midflight: could not read the size of opening frame %s. --aspect %s is not applied. The first --ref sets the video shape.\n' \
+      "$path" "$ratio" >&2
+    return 0
+  fi
+
+  aw="${ratio%%:*}"
+  ah="${ratio#*:}"
+  diff=$(( width * ah - height * aw ))
+  if [ "$diff" -lt 0 ]; then
+    diff=$(( -diff ))
+  fi
+  if [ $(( diff * 100 )) -gt $(( tolerance_percent * height * aw )) ]; then
+    die "opening frame is ${width}x${height} but --aspect is ${ratio}. The first --ref sets the video shape. Use an opening frame at that ratio, or omit --aspect."
+  fi
+}
+
+if [ "$MODE" = "video-gen" ] && [ -n "$ASPECT" ] && [ "${#REFS[@]}" -gt 0 ]; then
+  require_opening_frame_aspect "${REFS[0]}" "$ASPECT"
 fi
 
 normalize_provider_name() {

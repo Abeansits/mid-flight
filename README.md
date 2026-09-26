@@ -327,7 +327,7 @@ From Claude Code, prefer a non-`claude` provider — `provider=claude` is circul
 
 Video analysis uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
 
-Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config uses Grok when that CLI is on `PATH`. `-p` must be `grok`.
+Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config uses Grok when that CLI is on `PATH`. `-p` must be `grok`. The prompt asks for 720p when `image_to_video` lists `resolution_name`. The saved file can be smaller. The first `--ref` is the opening frame and sets the shape. A different `--aspect` is an error.
 
 ### Gemini CLI status
 
