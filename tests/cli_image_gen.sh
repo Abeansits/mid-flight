@@ -199,7 +199,6 @@ assert_eq "1" "$status" "image-gen with no saved file should exit 1"
 assert_contains "$err" "did not produce a saved image file" \
   "a missing image should be explained"
 
-# Naming a file this run did not write is not success.
 stale="$TEST_DIR/already-there.png"
 printf 'stale\n' > "$stale"
 cat > "$TEST_DIR/bin/grok" <<EOF

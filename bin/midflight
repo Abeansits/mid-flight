@@ -878,9 +878,18 @@ strip_path_punctuation() {
   printf '%s\n' "$candidate"
 }
 
-# Last absolute path in the text that exists on disk. Spaces and a wrapping
-# quote are kept, because the match shrinks from the end until -f succeeds.
-last_existing_path() {
+written_since_gen_stamp() {
+  local file="$1"
+  if [ -z "${GEN_STAMP:-}" ] || [ ! -f "$GEN_STAMP" ] || [ ! -f "$file" ]; then
+    return 1
+  fi
+  if [ "$file" -ef "$GEN_STAMP" ]; then
+    return 1
+  fi
+  [ ! "$file" -ot "$GEN_STAMP" ]
+}
+
+last_written_path() {
   local text="$1" i len rest candidate found=""
   case "$text" in
     \"*\") text="${text#\"}"; text="${text%\"}" ;;
@@ -898,7 +907,7 @@ last_existing_path() {
           case "$candidate" in
             *\"|*\') candidate="${candidate%?}"; continue ;;
           esac
-          if [ -f "$candidate" ]; then
+          if written_since_gen_stamp "$candidate"; then
             found="$candidate"
             break
           fi
@@ -933,7 +942,7 @@ is_reference_file() {
 
 # Last saved video in the reply. A reference image the model mentions does
 # not count, even when that file exists.
-last_existing_video_path() {
+last_written_video_path() {
   local text="$1" i len rest candidate found=""
   case "$text" in
     \"*\") text="${text#\"}"; text="${text%\"}" ;;
@@ -951,7 +960,7 @@ last_existing_video_path() {
           case "$candidate" in
             *\"|*\') candidate="${candidate%?}"; continue ;;
           esac
-          if [ -f "$candidate" ] && is_video_file "$candidate" && ! is_reference_file "$candidate"; then
+          if written_since_gen_stamp "$candidate" && is_video_file "$candidate" && ! is_reference_file "$candidate"; then
             found="$candidate"
             break
           fi
@@ -970,17 +979,17 @@ last_existing_video_path() {
 
 # -p/--model/--config runs the engine under a temp HOME so the real config
 # stays untouched. The model sometimes prints a sentence plus a path inside
-# that temp HOME. Return the last absolute path that exists, resolved.
+# that temp HOME.
 # Return 1 when the reply names no saved file.
 canonicalize_image_output() {
   local body="$1" trimmed found
   trimmed="${body%"${body##*[![:space:]]}"}"
   trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
-  if [ -n "$trimmed" ] && [ -f "$trimmed" ]; then
+  if [ -n "$trimmed" ] && written_since_gen_stamp "$trimmed"; then
     resolve_existing_path "$trimmed"
     return 0
   fi
-  found="$(last_existing_path "$trimmed")"
+  found="$(last_written_path "$trimmed")"
   if [ -n "$found" ]; then
     resolve_existing_path "$found"
     return 0
@@ -990,6 +999,8 @@ canonicalize_image_output() {
 
 if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   media_out="$WORKDIR/media-gen.out"
+  GEN_STAMP="$WORKDIR/gen-stamp"
+  touch "$GEN_STAMP"
   set +e
   if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
     CONFIG_HOME=""
@@ -1002,7 +1013,7 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   set -e
   if [ "$ec" -eq 0 ]; then
     if [ "$MODE" = "video-gen" ]; then
-      resolved="$(last_existing_video_path "$(cat "$media_out")" || true)"
+      resolved="$(last_written_video_path "$(cat "$media_out")" || true)"
     else
       resolved="$(canonicalize_image_output "$(cat "$media_out")" || true)"
     fi
