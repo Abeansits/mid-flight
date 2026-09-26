@@ -735,29 +735,57 @@ strip_path_punctuation() {
   printf '%s\n' "$candidate"
 }
 
+# Last absolute path in the text that exists on disk. Spaces and a wrapping
+# quote are kept, because the match shrinks from the end until -f succeeds.
+last_existing_path() {
+  local text="$1" i len rest candidate found=""
+  case "$text" in
+    \"*\") text="${text#\"}"; text="${text%\"}" ;;
+    \'*\') text="${text#\'}"; text="${text%\'}" ;;
+  esac
+  len=${#text}
+  i=0
+  while [ "$i" -lt "$len" ]; do
+    rest="${text:$i}"
+    case "$rest" in
+      /*)
+        candidate="$rest"
+        while [ -n "$candidate" ]; do
+          candidate="$(strip_path_punctuation "$candidate")"
+          case "$candidate" in
+            *\"|*\') candidate="${candidate%?}"; continue ;;
+          esac
+          if [ -f "$candidate" ]; then
+            found="$candidate"
+            break
+          fi
+          candidate="${candidate%?}"
+        done
+        ;;
+    esac
+    i=$((i + 1))
+  done
+  printf '%s\n' "$found"
+}
+
 # -p/--model/--config runs the engine under a temp HOME so the real config
 # stays untouched. The model sometimes prints a sentence plus a path inside
-# that temp HOME. Keep the last absolute path that exists, resolved, and
-# print only that. If nothing on disk matches, print the provider text as-is.
+# that temp HOME. Return the last absolute path that exists, resolved.
+# Return 1 when the reply names no saved file.
 canonicalize_image_output() {
-  local body="$1" trimmed candidate last=""
+  local body="$1" trimmed found
   trimmed="${body%"${body##*[![:space:]]}"}"
   trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
   if [ -n "$trimmed" ] && [ -f "$trimmed" ]; then
     resolve_existing_path "$trimmed"
-    return
+    return 0
   fi
-  while IFS= read -r candidate; do
-    candidate="$(strip_path_punctuation "$candidate")"
-    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-      last="$candidate"
-    fi
-  done < <(printf '%s\n' "$trimmed" | grep -oE '/[^[:space:]]+' || true)
-  if [ -n "$last" ]; then
-    resolve_existing_path "$last"
-    return
+  found="$(last_existing_path "$trimmed")"
+  if [ -n "$found" ]; then
+    resolve_existing_path "$found"
+    return 0
   fi
-  printf '%s\n' "$body"
+  return 1
 }
 
 if [ "$MODE" = "image-gen" ]; then
@@ -773,10 +801,18 @@ if [ "$MODE" = "image-gen" ]; then
   ec=$?
   set -e
   if [ "$ec" -eq 0 ]; then
-    canonicalize_image_output "$(cat "$image_out")"
-  else
-    cat "$image_out"
+    resolved="$(canonicalize_image_output "$(cat "$image_out")" || true)"
+    if [ -n "$resolved" ] && [ -f "$resolved" ]; then
+      printf '%s\n' "$resolved"
+      exit 0
+    fi
+    printf 'midflight: image-gen did not produce a saved image file\n' >&2
+    if [ -s "$image_out" ]; then
+      cat "$image_out" >&2
+    fi
+    exit 1
   fi
+  cat "$image_out"
   exit "$ec"
 fi
 

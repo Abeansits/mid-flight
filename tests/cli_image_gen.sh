@@ -13,10 +13,17 @@ provider=codex
 codex_model=test-codex
 EOF
 
-write_codex_stub "/tmp/paper-plane.png"
+plane="$TEST_DIR/paper-plane.png"
+printf 'png\n' > "$plane"
+write_codex_stub "$plane"
 
 output="$(run_cli --image-gen "a paper plane over a fjord")"
-assert_eq "/tmp/paper-plane.png" "$output" "--image-gen should print the codex image path"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$plane" ]; then
+  echo "FAIL: --image-gen should print the codex image path" >&2
+  echo "Expected file: $plane" >&2
+  echo "Actual:        $output" >&2
+  exit 1
+fi
 
 prompt="$(cat "$TEST_DIR/codex_prompt.txt")"
 assert_contains "$prompt" "a paper plane over a fjord" \
@@ -34,10 +41,17 @@ provider=agy
 agy_model=test-agy
 EOF
 
-write_grok_stub "/tmp/fjord.png"
+fjord="$TEST_DIR/fjord.png"
+printf 'png\n' > "$fjord"
+write_grok_stub "$fjord"
 
 output="$(run_cli --image-gen "a paper plane over a fjord")"
-assert_eq "/tmp/fjord.png" "$output" "agy config should fall back to grok for --image-gen"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$fjord" ]; then
+  echo "FAIL: agy config should fall back to grok for --image-gen" >&2
+  echo "Expected file: $fjord" >&2
+  echo "Actual:        $output" >&2
+  exit 1
+fi
 assert_eq "yes" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "image-gen grok must pass --always-approve"
 grok_prompt="$(cat "$TEST_DIR/grok_prompt.txt")"
@@ -51,9 +65,16 @@ provider=grok
 grok_model=grok-4
 EOF
 
-write_codex_stub "/tmp/from-codex.png"
+from_codex="$TEST_DIR/from-codex.png"
+printf 'png\n' > "$from_codex"
+write_codex_stub "$from_codex"
 output="$(run_cli -p codex --image-gen "a red kite")"
-assert_eq "/tmp/from-codex.png" "$output" "-p codex should override a grok config"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$from_codex" ]; then
+  echo "FAIL: -p codex should override a grok config" >&2
+  echo "Expected file: $from_codex" >&2
+  echo "Actual:        $output" >&2
+  exit 1
+fi
 assert_contains "$(cat "$TEST_DIR/codex_prompt.txt")" "a red kite" \
   "the overridden codex prompt should include the description"
 
@@ -145,5 +166,37 @@ if [[ "$output" == *midflight-cli* ]] || [[ "$output" == *"Done."* ]]; then
   echo "Actual: $output" >&2
   exit 1
 fi
+
+# A path with spaces, wrapped in a sentence and quotes, still resolves.
+mkdir -p "$HOME/.grok/images/My Pictures"
+cat > "$TEST_DIR/bin/grok" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+target="$HOME/.grok/images/My Pictures/plane.png"
+mkdir -p "$(dirname "$target")"
+printf 'spaced\n' > "$target"
+printf 'Saved at "%s".\n' "$target"
+EOF
+chmod +x "$TEST_DIR/bin/grok"
+
+output="$(run_cli -p grok --image-gen "a paper plane")"
+lasting="$HOME/.grok/images/My Pictures/plane.png"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$lasting" ]; then
+  echo "FAIL: a quoted path with spaces should resolve to the saved file" >&2
+  echo "Expected file: $lasting" >&2
+  echo "Actual:        $output" >&2
+  exit 1
+fi
+assert_eq "spaced" "$(cat "$output")" "the spaced path should be the saved image"
+
+# Success requires a file that exists. Prose alone is a failure.
+write_grok_stub "no image was saved"
+set +e
+err="$(run_cli -p grok --image-gen "a missing file" 2>&1)"
+status=$?
+set -e
+assert_eq "1" "$status" "image-gen with no saved file should exit 1"
+assert_contains "$err" "did not produce a saved image file" \
+  "a missing image should be explained"
 
 echo "PASS: --image-gen routes to codex or grok and rejects the other modes"
