@@ -5,7 +5,7 @@
 # optimized for mid-development consultation, and routes to the configured
 # provider (Codex, Gemini, Antigravity, OpenCode, or Oz). Response goes to stdout.
 #
-# Usage: query.sh <query-file-path> [consult|implement]
+# Usage: query.sh <query-file-path> [consult|implement|image-gen]
 #        query.sh <video-file-or-url> video [prompt]
 
 set -euo pipefail

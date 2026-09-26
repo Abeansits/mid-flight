@@ -47,6 +47,7 @@ midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude 
 Usage:
   midflight [OPTIONS] [QUESTION...]
   midflight --video FILE|URL [QUESTION...]
+  midflight --image-gen PROMPT
   midflight -f QUERY_FILE [OPTIONS]
 
 Options:
@@ -62,6 +63,7 @@ Options:
       --git-status        append current branch + git status under Context
       --diff              append git diff (working tree) and staged diff under Context
       --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
+      --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
       --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
                           wrapper owns a portable bash watchdog + process-group kill
                           so provider children die too; no coreutils needed; dual ≈ 2N wall)
@@ -91,6 +93,8 @@ Examples:
   midflight --diff --context notes.md "any race conditions in the unstaged work?"
   midflight -m implement -f request.md
   midflight --video ./ad.mp4 "does this match the storyboard?"
+  midflight --image-gen "a paper plane over a fjord"
+  midflight -p codex --image-gen "a paper plane over a fjord"
 
 The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
 see the project README for configuration details.
@@ -112,6 +116,7 @@ CONTEXT_FILE=""
 GIT_STATUS=0
 GIT_DIFF=0
 VIDEO_SOURCE=""
+IMAGE_GEN_PROMPT=""
 TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-path semantics); --timeout N enables the portable watchdog
 # Per-section cap for --git-status / --diff output (bytes). Override with MIDFLIGHT_GIT_CONTEXT_MAX_BYTES.
 GIT_CONTEXT_MAX_BYTES="${MIDFLIGHT_GIT_CONTEXT_MAX_BYTES:-102400}"
@@ -135,6 +140,15 @@ while [ $# -gt 0 ]; do
     --git-status)    GIT_STATUS=1; shift ;;
     --diff)          GIT_DIFF=1; shift ;;
     --video)         VIDEO_SOURCE="${2:-}"; shift 2 ;;
+    --image-gen)
+      [ $# -ge 2 ] || die "--image-gen requires a prompt"
+      [ -n "$2" ] || die "--image-gen requires a prompt"
+      case "$2" in
+        -*) die "--image-gen requires a prompt (got '$2')" ;;
+      esac
+      IMAGE_GEN_PROMPT="$2"
+      shift 2
+      ;;
     --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help)       usage; exit 0 ;;
     -V|--version)    version; exit 0 ;;
@@ -144,14 +158,29 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# --image-gen and --video are separate modes. --video analyzes a file.
+if [ -n "$IMAGE_GEN_PROMPT" ] && [ -n "$VIDEO_SOURCE" ]; then
+  die "--image-gen cannot be combined with --video"
+fi
+if [ -n "$IMAGE_GEN_PROMPT" ] && [ -n "$MODE" ]; then
+  die "--image-gen cannot be combined with -m/--mode"
+fi
+if [ -n "$IMAGE_GEN_PROMPT" ]; then
+  MODE="image-gen"
+fi
+
 # --video implies video mode; otherwise default to consult.
 [ -n "$VIDEO_SOURCE" ] && MODE="video"
 [ -z "$MODE" ] && MODE="consult"
 
 case "$MODE" in
-  consult|implement|video) ;;
+  consult|implement|video|image-gen) ;;
   *) die "invalid mode '$MODE' (expected consult, implement, or video)" ;;
 esac
+
+if [ "$MODE" = "image-gen" ] && [ -z "$IMAGE_GEN_PROMPT" ]; then
+  die "image generation requires --image-gen PROMPT"
+fi
 
 normalize_provider_name() {
   case "$1" in
@@ -160,6 +189,14 @@ normalize_provider_name() {
     *)           printf '%s\n' "$1" ;;
   esac
 }
+
+if [ "$MODE" = "image-gen" ] && [ -n "$PROVIDER" ]; then
+  PROVIDER="$(normalize_provider_name "$PROVIDER")"
+  case "$PROVIDER" in
+    codex|grok) ;;
+    *) die "--image-gen supports codex and grok (got '$PROVIDER')" ;;
+  esac
+fi
 
 provider_label() {
   case "$1" in
@@ -328,6 +365,7 @@ build_config_home() {
   if [ -n "$MODEL" ]; then
     local effective_provider="$PROVIDER"
     local write_google_models="false"
+    local write_image_models="false"
 
     if [ "$MODE" = "video" ]; then
       case "$effective_provider" in
@@ -342,6 +380,15 @@ build_config_home() {
     fi
     [ -z "$effective_provider" ] && [ "$write_google_models" != "true" ] && effective_provider="codex"
 
+    # image-gen uses grok or codex. A different configured provider is replaced
+    # by the engine, so stamp both model keys the fallback might read.
+    if [ "$MODE" = "image-gen" ]; then
+      case "$effective_provider" in
+        codex|grok|grok-build) ;;
+        *) write_image_models="true" ;;
+      esac
+    fi
+
     write_model_key() {
       local key="$1"
       grep -v "^${key}=" "$config" > "$config.tmp" 2>/dev/null || true
@@ -352,6 +399,9 @@ build_config_home() {
     if [ "$write_google_models" = "true" ]; then
       write_model_key "gemini_model"
       write_model_key "agy_model"
+    elif [ "$write_image_models" = "true" ]; then
+      write_model_key "grok_model"
+      write_model_key "codex_model"
     else
       local model_key=""
       case "$effective_provider" in
@@ -546,7 +596,18 @@ run_engine() {
 
 # Determine engine arguments by mode.
 declare -a engine_args
-if [ "$MODE" = "video" ]; then
+if [ "$MODE" = "image-gen" ]; then
+  [ -z "$QUERY_FILE" ] || die "--image-gen cannot be combined with --query-file"
+  if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] || have_git_flags; then
+    die "--context/--include/--git-status/--diff do not apply to --image-gen"
+  fi
+  if [ -n "$QUESTION" ]; then
+    die "pass the image description to --image-gen, not as a separate question"
+  fi
+  image_prompt_file="$WORKDIR/image-prompt.md"
+  printf '%s\n' "$IMAGE_GEN_PROMPT" > "$image_prompt_file"
+  engine_args=("$image_prompt_file" "image-gen")
+elif [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
   [ -z "$QUERY_FILE" ] || die "--query-file cannot be combined with --video"
   if [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ] || have_git_flags; then
@@ -650,6 +711,109 @@ if [ "$want_dual" -eq 1 ]; then
     exit 0
   fi
   exit 1
+fi
+
+# Resolve a path that exists right now. cd -P follows the temp-HOME symlink
+# into the real ~/.grok (or ~/.codex) before this process deletes the temp dir.
+resolve_existing_path() {
+  local target="$1" dir base
+  dir="$(cd -P "$(dirname "$target")" && pwd)"
+  base="$(basename "$target")"
+  printf '%s\n' "$dir/$base"
+}
+
+# Drop a trailing period or comma the model glues onto a path.
+strip_path_punctuation() {
+  local candidate="$1" lastchar
+  while [ -n "$candidate" ]; do
+    lastchar="${candidate#"${candidate%?}"}"
+    case "$lastchar" in
+      "."|","|":"|";") candidate="${candidate%?}" ;;
+      *) break ;;
+    esac
+  done
+  printf '%s\n' "$candidate"
+}
+
+# Last absolute path in the text that exists on disk. Spaces and a wrapping
+# quote are kept, because the match shrinks from the end until -f succeeds.
+last_existing_path() {
+  local text="$1" i len rest candidate found=""
+  case "$text" in
+    \"*\") text="${text#\"}"; text="${text%\"}" ;;
+    \'*\') text="${text#\'}"; text="${text%\'}" ;;
+  esac
+  len=${#text}
+  i=0
+  while [ "$i" -lt "$len" ]; do
+    rest="${text:$i}"
+    case "$rest" in
+      /*)
+        candidate="$rest"
+        while [ -n "$candidate" ]; do
+          candidate="$(strip_path_punctuation "$candidate")"
+          case "$candidate" in
+            *\"|*\') candidate="${candidate%?}"; continue ;;
+          esac
+          if [ -f "$candidate" ]; then
+            found="$candidate"
+            break
+          fi
+          candidate="${candidate%?}"
+        done
+        ;;
+    esac
+    i=$((i + 1))
+  done
+  printf '%s\n' "$found"
+}
+
+# -p/--model/--config runs the engine under a temp HOME so the real config
+# stays untouched. The model sometimes prints a sentence plus a path inside
+# that temp HOME. Return the last absolute path that exists, resolved.
+# Return 1 when the reply names no saved file.
+canonicalize_image_output() {
+  local body="$1" trimmed found
+  trimmed="${body%"${body##*[![:space:]]}"}"
+  trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
+  if [ -n "$trimmed" ] && [ -f "$trimmed" ]; then
+    resolve_existing_path "$trimmed"
+    return 0
+  fi
+  found="$(last_existing_path "$trimmed")"
+  if [ -n "$found" ]; then
+    resolve_existing_path "$found"
+    return 0
+  fi
+  return 1
+}
+
+if [ "$MODE" = "image-gen" ]; then
+  image_out="$WORKDIR/image-gen.out"
+  set +e
+  if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
+    CONFIG_HOME=""
+    build_config_home
+    HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$image_out"
+  else
+    run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$image_out"
+  fi
+  ec=$?
+  set -e
+  if [ "$ec" -eq 0 ]; then
+    resolved="$(canonicalize_image_output "$(cat "$image_out")" || true)"
+    if [ -n "$resolved" ] && [ -f "$resolved" ]; then
+      printf '%s\n' "$resolved"
+      exit 0
+    fi
+    printf 'midflight: image-gen did not produce a saved image file\n' >&2
+    if [ -s "$image_out" ]; then
+      cat "$image_out" >&2
+    fi
+    exit 1
+  fi
+  cat "$image_out"
+  exit "$ec"
 fi
 
 if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then

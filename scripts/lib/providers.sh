@@ -108,8 +108,8 @@ query_codex() {
 
   # `--sandbox` only gates model-generated shell/tool writes (codex-cli help),
   # not host session/rollout files under $CODEX_HOME. Consult/video stay
-  # read-only; only implement needs workspace-write to apply edits.
-  if [ "${MODE:-}" = "implement" ]; then
+  # read-only. Implement edits files, and image-gen writes the image.
+  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ]; then
     sandbox_mode="workspace-write"
   fi
 
@@ -270,8 +270,9 @@ query_grok() {
     args+=(--effort "$grok_effort")
   fi
 
-  # Consult/video stay gated; implement must auto-approve tool calls.
-  if [ "${MODE:-}" = "implement" ]; then
+  # Consult/video stay gated. Implement edits files, and image-gen calls
+  # the Imagine tool, so both must auto-approve in a non-interactive run.
+  if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ]; then
     args+=(--always-approve)
   fi
 

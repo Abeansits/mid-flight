@@ -54,15 +54,18 @@ write_codex_stub() {
 set -euo pipefail
 output_file=""
 prompt=""
+sandbox=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -o|--output-last-message) output_file="\$2"; shift 2 ;;
-    --model|-c|--sandbox) shift 2 ;;
+    --sandbox) sandbox="\$2"; shift 2 ;;
+    --model|-c) shift 2 ;;
     --skip-git-repo-check) shift ;;
     *) prompt="\$1"; shift ;;
   esac
 done
 printf '%s' "\$prompt" > "$TEST_DIR/codex_prompt.txt"
+printf '%s' "\$sandbox" > "$TEST_DIR/codex_sandbox.txt"
 printf '%s\n' "$response" > "\$output_file"
 EOF
   chmod +x "$TEST_DIR/bin/codex"

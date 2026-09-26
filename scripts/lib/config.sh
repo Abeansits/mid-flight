@@ -233,6 +233,26 @@ validate_config_state() {
 resolve_provider_for_mode() {
   local mode="$1"
 
+  if [ "$mode" = "image-gen" ]; then
+    case "$provider" in
+      grok|codex)
+        return
+        ;;
+    esac
+
+    if command -v grok >/dev/null 2>&1; then
+      log "image-gen: overriding provider=$provider -> grok"
+      provider="grok"
+    elif command -v codex >/dev/null 2>&1; then
+      log "image-gen: overriding provider=$provider -> codex"
+      provider="codex"
+    else
+      log "image-gen: overriding provider=$provider -> grok"
+      provider="grok"
+    fi
+    return
+  fi
+
   if [ "$mode" != "video" ]; then
     return
   fi
