@@ -33,6 +33,8 @@ assert_eq "high" "$(cat "$TEST_DIR/agy_effort.txt")" "agy should receive the con
 assert_eq "text" "$(cat "$TEST_DIR/agy_output_format.txt")" "agy should request text output"
 assert_eq "no" "$(cat "$TEST_DIR/agy_skip_permissions.txt")" \
   "consult must not pass --dangerously-skip-permissions"
+assert_eq "" "$(cat "$TEST_DIR/agy_unknown_args.txt")" \
+  "consult agy has no read-only flag to pass"
 assert_contains "$(cat "$TEST_DIR/agy_prompt.txt")" \
   "You are a senior engineer being consulted mid-development." \
   "agy prompt should include the consult system prompt"

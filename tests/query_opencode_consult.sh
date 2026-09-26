@@ -29,6 +29,8 @@ variant=""
 format=""
 dir=""
 prompt=""
+auto="no"
+permission_env="\${OPENCODE_PERMISSION:-}"
 
 while [ \$# -gt 0 ]; do
   case "\$1" in
@@ -53,6 +55,10 @@ while [ \$# -gt 0 ]; do
       dir="\$2"
       shift 2
       ;;
+    --auto|--dangerously-skip-permissions)
+      auto="yes"
+      shift
+      ;;
     *)
       prompt="\$1"
       shift
@@ -61,6 +67,8 @@ while [ \$# -gt 0 ]; do
 done
 
 printf '%s' "\$model" > "$TEST_DIR/opencode_model.txt"
+printf '%s' "\$auto" > "$TEST_DIR/opencode_auto.txt"
+printf '%s' "\$permission_env" > "$TEST_DIR/opencode_permission_env.txt"
 printf '%s' "\$variant" > "$TEST_DIR/opencode_variant.txt"
 printf '%s' "\$format" > "$TEST_DIR/opencode_format.txt"
 printf '%s' "\$dir" > "$TEST_DIR/opencode_dir.txt"
@@ -94,6 +102,19 @@ assert_contains "$(cat "$TEST_DIR/opencode_prompt.txt")" \
 assert_contains "$(cat "$TEST_DIR/opencode_prompt.txt")" \
   "Should MidFlight share one provider contract?" \
   "OpenCode prompt should include the query body"
+assert_eq "no" "$(cat "$TEST_DIR/opencode_auto.txt")" \
+  "consult must not pass --auto"
+assert_eq "" "$(cat "$TEST_DIR/opencode_permission_env.txt")" \
+  "consult must not set OPENCODE_PERMISSION"
+
+output="$(run_query "$QUERY_FILE" implement)"
+assert_eq "opencode-ok" "$output" "implement query should return stubbed OpenCode output"
+assert_eq "no" "$(cat "$TEST_DIR/opencode_auto.txt")" \
+  "implement must not pass --auto"
+assert_eq "" "$(cat "$TEST_DIR/opencode_permission_env.txt")" \
+  "implement must not set OPENCODE_PERMISSION"
+assert_eq "anthropic/claude-sonnet-4-0" "$(cat "$TEST_DIR/opencode_model.txt")" \
+  "implement should still receive the configured model"
 
 echo "PASS: consult mode routes through opencode with the expected flags and prompt"
 
