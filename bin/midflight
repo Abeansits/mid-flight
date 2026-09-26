@@ -886,7 +886,8 @@ written_since_gen_stamp() {
   if [ "$file" -ef "$GEN_STAMP" ]; then
     return 1
   fi
-  [ ! "$file" -ot "$GEN_STAMP" ]
+  # Strictly newer. An equal whole-second mtime is a pre-existing file.
+  [ "$file" -nt "$GEN_STAMP" ]
 }
 
 last_written_path() {
@@ -1001,6 +1002,9 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   media_out="$WORKDIR/media-gen.out"
   GEN_STAMP="$WORKDIR/gen-stamp"
   touch "$GEN_STAMP"
+  # macOS bash compares mtimes in whole seconds. Run the provider after
+  # that second so a file it writes is strictly newer than the stamp.
+  sleep 1
   set +e
   if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
     CONFIG_HOME=""
