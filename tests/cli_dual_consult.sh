@@ -68,6 +68,18 @@ assert_contains "$output" "## Provider B: Gemini" "failed provider still labeled
 assert_contains "$output" "Gemini authentication failed" "failed provider error shown"
 assert_contains "$output" "Gemini failed; only Codex" "framing notes which side failed"
 
+# Same one-sided failure under --timeout. The watchdog must not turn the
+# failed side's status into 0, or dual consult would exit 0 and skip the
+# "failed" framing.
+set +e
+output="$(run_cli --timeout 3 --providers codex,gemini "partial under timeout?" 2>/dev/null)"
+status=$?
+set -e
+assert_eq "1" "$status" "one-sided dual failure under --timeout should exit 1"
+assert_contains "$output" "codex survived" "successful answer still shown under --timeout"
+assert_contains "$output" "Gemini authentication failed" "failed side error still shown under --timeout"
+assert_contains "$output" "Gemini failed; only Codex" "failed side stays failed under --timeout"
+
 # Refuse implement dual
 set +e
 bad="$(run_cli -m implement --dual agy "do it" 2>&1)"

@@ -688,9 +688,13 @@ run_engine() {
         kill -TERM $PPID 2>/dev/null || true
       ) 3>&2 >/dev/null 2>&1 &
       k=$!
-      wait "$pg" 2>/dev/null || true
-      ec=$?
-      kill "$k" 2>/dev/null || true
+      # `|| true` would make $? the status of true, so a provider that
+      # exits before the deadline (or is killed by it) would look like success.
+      ec=0
+      wait "$pg" 2>/dev/null || ec=$?
+      # Kill the watchdog group, not only the subshell. Otherwise its sleep
+      # keeps running and this shell waits out the rest of the deadline.
+      kill -TERM -"$k" 2>/dev/null || true
       wait "$k" 2>/dev/null || true
       exit "$ec"
     ' _ "$@"
