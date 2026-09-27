@@ -11,8 +11,8 @@ Agent Skills for [Grok Build](https://docs.x.ai/build/features/skills-plugins-ma
 
 `scripts/resolve-engine.sh` (and the skill `scripts/run.sh` wrappers) pick an engine in this order:
 
-1. `midflight` on `PATH`
-2. `$MIDFLIGHT_ROOT` (checkout or install prefix)
+1. `midflight` on `PATH` (Homebrew installs this)
+2. `$MIDFLIGHT_ROOT` (a clone)
 3. Walk up from the skill path to a mid-flight repo root
 
 ## Circular provider guard
@@ -42,7 +42,7 @@ mkdir -p ~/.agents/skills
 ln -s "$(pwd)/hosts/grok/skills/midflight" ~/.agents/skills/midflight
 ```
 
-Engine still needs to be reachable (`midflight` on `PATH` or `MIDFLIGHT_ROOT`).
+The engine still has to be reachable. Homebrew puts `midflight` on `PATH`. A clone uses `bin/midflight` or `MIDFLIGHT_ROOT`.
 
 See the root [README](../../README.md#4-grok-build-skills) for the full install door.
 

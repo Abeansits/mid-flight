@@ -11,8 +11,8 @@ Agent Skills for [Cursor](https://cursor.com/docs/skills) that invoke the shared
 
 `scripts/resolve-engine.sh` (and the skill `scripts/run.sh` wrappers) pick an engine in this order:
 
-1. `midflight` on `PATH`
-2. `$MIDFLIGHT_ROOT` (checkout or install prefix)
+1. `midflight` on `PATH` (Homebrew installs this)
+2. `$MIDFLIGHT_ROOT` (a clone)
 3. Walk up from the skill path to a mid-flight repo root
 
 When `$MIDFLIGHT_ROOT` is set and contains `bin/midflight`, that binary is preferred over falling straight to `scripts/query.sh`.
@@ -63,7 +63,7 @@ npx skills add Abeansits/mid-flight/hosts/cursor/skills --skill midflight --agen
 
 If the CLI lands skills under `~/.agents/skills/` only, symlink into `~/.cursor/skills/` so `/midflight` slash invoke works.
 
-Engine still needs to be reachable (`midflight` on `PATH` or `MIDFLIGHT_ROOT`).
+The engine still has to be reachable. Homebrew puts `midflight` on `PATH`. A clone uses `bin/midflight` or `MIDFLIGHT_ROOT`.
 
 See the root [README](../../README.md#5-cursor-skills) for the full install door.
 

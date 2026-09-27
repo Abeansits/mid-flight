@@ -22,6 +22,11 @@ Notes:
   - Run prepare on a branch, open/merge the PR, then switch to main.
   - Only run publish from a clean, up-to-date local main. Tagging from any
     other branch or a dirty main is intentionally blocked.
+  - After publish, update Formula/midflight.rb url and sha256 to the new tag
+    archive. Homebrew keeps serving the previous tag until that change is on
+    main. sha256sum the file at
+    https://github.com/Abeansits/mid-flight/archive/refs/tags/vX.Y.Z.tar.gz
+    (macOS: shasum -a 256).
 EOF
 }
 
@@ -126,6 +131,7 @@ publish_release() {
   gh release create "$tag" --generate-notes --latest
 
   printf 'Published %s from clean main.\n' "$tag"
+  printf 'Next: set Formula/midflight.rb url and sha256 to the %s archive.\n' "$tag"
 }
 
 main() {

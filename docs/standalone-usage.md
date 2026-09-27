@@ -18,26 +18,33 @@ pass and hands it to the engine — it does not call a model to summarize for yo
 
 ## Install
 
-`bin/midflight` is self-contained and finds the engine relative to its own
-(symlink-resolved) location. Prefer the installer (no manual `ln -s`):
+`bin/midflight` finds the engine relative to its own symlink-resolved location.
+
+Homebrew is the supported install. The formula is `Formula/midflight.rb` in this repo. Pass the git URL because the repo is not named `homebrew-*`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
+brew install Abeansits/mid-flight/midflight
 midflight --version
 ```
 
-Default source ref is `main` (tip). Pin with `--ref vX.Y.Z` if you want a tagged release (releases may lag `main`).
-From a checkout: `./scripts/install.sh --from-dir . --prefix ~/.local`.
-Homebrew formula sketch (tap not published): `brew install --HEAD --formula ./Formula/midflight.rb`.
+`brew install` uses the tagged release named in the formula. `brew install --HEAD Abeansits/mid-flight/midflight` tracks `main`.
 
-Dev symlink still works:
+Without Homebrew, clone the repo and run the binary in place, or set `MIDFLIGHT_ROOT` to that checkout:
 
 ```bash
-ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight
-midflight --version
+git clone https://github.com/Abeansits/mid-flight.git
+cd mid-flight
+./bin/midflight --version
+export MIDFLIGHT_ROOT="$(pwd)"
 ```
 
-You can also run it in place with `./bin/midflight ...`.
+If an older `scripts/install.sh` copy is still on `PATH`, remove it before `brew install`. The old default directory was `/usr/local` when that directory was writable, otherwise `~/.local`.
+
+```bash
+rm -f ~/.local/bin/midflight /usr/local/bin/midflight
+rm -rf ~/.local/lib/mid-flight /usr/local/lib/mid-flight
+```
 
 ### Prerequisites
 

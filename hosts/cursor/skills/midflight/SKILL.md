@@ -30,10 +30,10 @@ bash "<path-to-this-skill>/scripts/run.sh" ...
 Resolution order inside the runner:
 
 1. `midflight` on `PATH` (preferred)
-2. `$MIDFLIGHT_ROOT` (clone or install prefix with `bin/` + `scripts/`)
+2. `$MIDFLIGHT_ROOT` (a clone with `bin/` + `scripts/`)
 3. Walk up from this skill to a mid-flight checkout (repo-local / symlink installs)
 
-If resolution fails, tell the user to install the standalone CLI (`ln -s …/bin/midflight` onto `PATH`) or set `MIDFLIGHT_ROOT`.
+If resolution fails, tell the user to install with Homebrew (`brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight`, then `brew install Abeansits/mid-flight/midflight`) or clone the repo and set `MIDFLIGHT_ROOT` to that checkout. `bin/midflight` in the clone also works.
 
 ## Your job
 
