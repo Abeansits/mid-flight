@@ -785,7 +785,9 @@ run_engine() {
       pg=$!
       exec 3>&2
       (
-        sleep '"$to"'
+        # A signaled sleep returns non-zero. Exit before printf so a kill that
+        # stops sleep and leaves this shell alive cannot report a false timeout.
+        sleep '"$to"' || exit 0
         printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
         kill -TERM -"$pg" 2>/dev/null || true
         sleep 1
