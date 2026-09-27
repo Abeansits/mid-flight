@@ -199,4 +199,35 @@ assert_eq "1" "$status" "image-gen with no saved file should exit 1"
 assert_contains "$err" "did not produce a saved image file" \
   "a missing image should be explained"
 
+stale="$TEST_DIR/already-there.png"
+printf 'stale\n' > "$stale"
+cat > "$TEST_DIR/bin/grok" <<EOF
+#!/bin/bash
+set -euo pipefail
+printf 'Saved at "%s".\n' "$stale"
+EOF
+chmod +x "$TEST_DIR/bin/grok"
+set +e
+err="$(run_cli -p grok --image-gen "a paper plane" 2>&1)"
+status=$?
+set -e
+assert_eq "1" "$status" "naming a pre-existing image should exit 1"
+assert_contains "$err" "did not produce a saved image file" \
+  "a pre-existing image should be explained"
+assert_eq "stale" "$(cat "$stale")" "the pre-existing image should stay untouched"
+
+cat > "$TEST_DIR/bin/grok" <<EOF
+#!/bin/bash
+set -euo pipefail
+printf '%s\n' "$stale"
+EOF
+chmod +x "$TEST_DIR/bin/grok"
+set +e
+err="$(run_cli -p grok --image-gen "a paper plane" 2>&1)"
+status=$?
+set -e
+assert_eq "1" "$status" "a bare pre-existing image path should exit 1"
+assert_contains "$err" "did not produce a saved image file" \
+  "a bare pre-existing image path should be explained"
+
 echo "PASS: --image-gen routes to codex or grok and rejects the other modes"

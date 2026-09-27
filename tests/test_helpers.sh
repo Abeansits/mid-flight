@@ -48,6 +48,10 @@ run_check_config() {
 # write a canned response. Optional arg overrides the response text.
 write_codex_stub() {
   local response="${1:-stub-codex-ok}"
+  local refresh=""
+  if [ -f "$response" ]; then
+    refresh="touch $(printf '%q' "$response")"
+  fi
 
   cat > "$TEST_DIR/bin/codex" <<EOF
 #!/bin/bash
@@ -67,6 +71,7 @@ while [ \$# -gt 0 ]; do
 done
 printf '%s' "\$prompt" > "$TEST_DIR/codex_prompt.txt"
 printf '%s' "\$sandbox" > "$TEST_DIR/codex_sandbox.txt"
+${refresh}
 printf '%s\n' "$response" > "\$output_file"
 EOF
   chmod +x "$TEST_DIR/bin/codex"
@@ -136,6 +141,10 @@ EOF
 # Optional arg overrides the response text.
 write_grok_stub() {
   local response="${1:-stub-grok-ok}"
+  local refresh=""
+  if [ -f "$response" ]; then
+    refresh="touch $(printf '%q' "$response")"
+  fi
 
   cat > "$TEST_DIR/bin/grok" <<EOF
 #!/bin/bash
@@ -160,6 +169,7 @@ printf '%s' "\$model" > "$TEST_DIR/grok_model.txt"
 printf '%s' "\$effort" > "$TEST_DIR/grok_effort.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/grok_output_format.txt"
 printf '%s' "\$always_approve" > "$TEST_DIR/grok_always_approve.txt"
+${refresh}
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/grok"
