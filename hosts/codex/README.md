@@ -11,9 +11,11 @@ Agent Skills for [Codex](https://developers.openai.com/codex/skills) that invoke
 
 `scripts/resolve-engine.sh` (and the skill `scripts/run.sh` wrappers) pick an engine in this order:
 
-1. `midflight` on `PATH`
-2. `$MIDFLIGHT_ROOT` (checkout or install prefix)
+1. `midflight` on `PATH` (Homebrew installs this)
+2. `$MIDFLIGHT_ROOT` (a clone)
 3. Walk up from the skill path to a mid-flight repo root
+
+Homebrew puts `midflight` on `PATH`. Without Homebrew, run `bin/midflight` from a clone or set `MIDFLIGHT_ROOT` to that clone. See the root [README](../../README.md#2-standalone-cli).
 
 ## Circular provider guard
 

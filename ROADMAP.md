@@ -61,7 +61,7 @@ Evidence that session/scratch still works under read-only: Codex CLI (`codex exe
 
 ### 7. Real CLI install — shipped on `main` (v1.14.0, PR #21)
 
-`scripts/install.sh` for `curl -fsSL … | bash` (HTTPS-only download, `PREFIX`/`DESTDIR`, `--from-dir` offline path) plus an in-repo Homebrew formula sketch at `Formula/midflight.rb`. The tap is not published. Homebrew 7 will not install a formula that is not in a tap (`brew install --formula ./Formula/midflight.rb` is rejected). Version is written to both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` by `scripts/release.sh prepare`.
+v1.14.0 added `scripts/install.sh` and a HEAD-only `Formula/midflight.rb`. The custom installer is gone. Homebrew is the install path. `scripts/release.sh prepare` still writes the version to both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`.
 
 ### 8. Dual-consult overlay on a real `$HOME` — shipped on `main` (v1.15.1, PR #24)
 
@@ -70,6 +70,14 @@ Evidence that session/scratch still works under read-only: Codex CLI (`codex exe
 ### 9. One Cursor skill path — shipped on `main` (PR #26)
 
 Removed `hosts/grok-bot/` and the docs-only `skills/mid-flight/SKILL.md` (no `run.sh`). Cursor agents and Cursor's Grok Bot both use `hosts/cursor/`. The grok-bot run-query test was the macOS CI failure: bash 3.2 treats an empty `"${array[@]}"` as unset under `set -u`.
+
+### 10. Homebrew install
+
+`Formula/midflight.rb` installs a tagged GitHub archive. It keeps the repo layout under Homebrew's `libexec`, because `bin/midflight` finds `scripts/` and `.claude-plugin/` from its real path. `head` remains, so `brew install --HEAD` tracks `main`.
+
+The tap is this repo. `brew tap Abeansits/mid-flight` with no URL expects `Abeansits/homebrew-mid-flight`. Pass the git URL instead. A local `brew install --formula ./Formula/midflight.rb` is not a tap, and current Homebrew rejects it.
+
+Each release still needs a follow-up that sets `url` and `sha256` in `Formula/midflight.rb`. Until that lands on `main`, `brew upgrade` stays on the previous tag. A clone plus `./bin/midflight` or `MIDFLIGHT_ROOT` is the path without Homebrew.
 
 ## Later
 

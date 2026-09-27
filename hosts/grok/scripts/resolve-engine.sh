@@ -9,13 +9,13 @@
 # Resolution order:
 #   1. midflight on PATH — use the CLI for queries; for --check, follow the
 #      binary to its install root and use scripts/check-config.sh
-#   2. MIDFLIGHT_ROOT (clone or install prefix)
+#   2. MIDFLIGHT_ROOT (a clone)
 #   3. Walk up from --start-dir / this script looking for the repo layout
 #
 # Usage:
 #   resolve-engine.sh [--check] [--start-dir DIR]
 # Env:
-#   MIDFLIGHT_ROOT  — install/clone root containing bin/ and scripts/
+#   MIDFLIGHT_ROOT  — clone root containing bin/ and scripts/
 
 set -euo pipefail
 

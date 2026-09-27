@@ -120,43 +120,39 @@ Claude already has the session, so it writes the context summary for you. It can
 
 Same engine, no Claude Code required. Use it from a terminal, a script, or CI. You supply the question (and optionally the context).
 
-**Install (recommended)** — puts `midflight` on your `PATH` without a manual `ln -s` from a clone. The one-liner installs from **`main`** (repo tip):
+**Homebrew (recommended).** `Formula/midflight.rb` lives in this repo. The repo is not named `homebrew-*`, so pass the git URL. The install uses the tagged release in the formula and puts `midflight` on your `PATH`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
+brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
+brew install Abeansits/mid-flight/midflight
 midflight --version
 ```
 
-Published GitHub releases may lag plugin metadata on `main`. Pin a release tag only when you want that exact tree (install script + matching source tarball):
+`brew tap Abeansits/mid-flight` with no URL looks for `Abeansits/homebrew-mid-flight`, which does not exist. `brew install --formula ./Formula/midflight.rb` is not a tap, and current Homebrew rejects it.
+
+To track `main` instead of the tagged release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/vX.Y.Z/scripts/install.sh | bash -s -- --ref vX.Y.Z
+brew install --HEAD Abeansits/mid-flight/midflight
 ```
 
-Defaults: source ref is `main`; install prefix is `/usr/local` when writable, otherwise `~/.local`. Override with `PREFIX=…` / `--prefix`, or `REF=…` / `--ref`. Packaging can set `DESTDIR`.
-
-From a checkout (offline / local):
-
-```bash
-./scripts/install.sh --from-dir . --prefix ~/.local
-```
-
-**Homebrew (formula in-repo; tap not published yet):**
+**Clone (no Homebrew).** From that checkout, `./bin/midflight` finds the engine next to itself. Host skills use the same checkout when `MIDFLIGHT_ROOT` points at it.
 
 ```bash
 git clone https://github.com/Abeansits/mid-flight.git
 cd mid-flight
-brew install --HEAD --formula ./Formula/midflight.rb
+./bin/midflight --version
+export MIDFLIGHT_ROOT="$(pwd)"
 ```
 
-Do not use `brew tap Abeansits/mid-flight` until that tap exists. A stable `url`/`sha256` will be added to `Formula/midflight.rb` when a matching GitHub release is published.
-
-**Dev symlink** (still fine if you are hacking on a clone):
+**Already installed with `scripts/install.sh`.** Remove that copy so the shell does not run it instead of the Homebrew `midflight`. The old default directory was `/usr/local` when that directory was writable, otherwise `~/.local`.
 
 ```bash
-ln -s "$(pwd)/bin/midflight" /usr/local/bin/midflight
-midflight --version
+rm -f ~/.local/bin/midflight /usr/local/bin/midflight
+rm -rf ~/.local/lib/mid-flight /usr/local/lib/mid-flight
 ```
+
+Then run the Homebrew commands above. If that copy lives in another directory, remove `bin/midflight` and `lib/mid-flight` there.
 
 ```bash
 midflight "should we use SSE or WebSockets for real-time updates?"
@@ -185,9 +181,10 @@ Same engine, for [Codex](https://developers.openai.com/codex/skills) (`$midfligh
 **Engine first** (the skills call it):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
-# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
+brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
+brew install Abeansits/mid-flight/midflight
+# No Homebrew: clone the repo and export MIDFLIGHT_ROOT to that directory.
+# See section 2.
 ```
 
 **Then install the skills** (pick one):
@@ -229,9 +226,10 @@ Same engine, for [Grok Build](https://docs.x.ai/build/features/skills-plugins-ma
 **Engine first** (the skills call it):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
-# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
+brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
+brew install Abeansits/mid-flight/midflight
+# No Homebrew: clone the repo and export MIDFLIGHT_ROOT to that directory.
+# See section 2.
 ```
 
 **Then install the skills** (copy or symlink — prefer this over marketplace publish):
@@ -275,9 +273,10 @@ Same engine, for [Cursor](https://cursor.com/docs/skills) (`/midflight` Agent Sk
 **Engine first** (the skills call it):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Abeansits/mid-flight/main/scripts/install.sh | bash
-# or from a checkout: ./scripts/install.sh --from-dir . --prefix ~/.local
-# or set MIDFLIGHT_ROOT to a clone instead of putting midflight on PATH
+brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
+brew install Abeansits/mid-flight/midflight
+# No Homebrew: clone the repo and export MIDFLIGHT_ROOT to that directory.
+# See section 2.
 ```
 
 **Then install the skills** (copy or symlink — recommended):
@@ -440,6 +439,21 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 
 Debug logs: run the host with debug on (e.g. `claude --debug`). Lines are prefixed `[mid-flight]` on stderr (mode, provider, query size, response size, duration).
 
+## Updating / uninstall (Homebrew)
+
+`brew upgrade` installs the tag in `Formula/midflight.rb` on `main`. A GitHub release is not a Homebrew upgrade until that file changes. The [Releasing](#releasing) steps include the checksum update.
+
+```bash
+brew update
+brew upgrade Abeansits/mid-flight/midflight
+```
+
+```bash
+brew uninstall Abeansits/mid-flight/midflight
+```
+
+`brew untap Abeansits/mid-flight` removes the tap. It leaves a Claude Code plugin install alone.
+
 ## Updating / uninstall (Claude plugin)
 
 ```bash
@@ -466,8 +480,17 @@ Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.
 
 1. On a working branch: `scripts/release.sh prepare X.Y.Z` — bumps `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, commits.
 2. Merge the PR, switch to a clean local `main` that matches `origin/main`, then `scripts/release.sh publish X.Y.Z`.
+3. Update `Formula/midflight.rb` in a follow-up. Set `url` to `https://github.com/Abeansits/mid-flight/archive/refs/tags/vX.Y.Z.tar.gz` and set `sha256` to that file. Homebrew serves the new tag only after that change is on `main`.
 
-`publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch.
+```bash
+curl -fsSL -o /tmp/midflight.tar.gz \
+  https://github.com/Abeansits/mid-flight/archive/refs/tags/vX.Y.Z.tar.gz
+sha256sum /tmp/midflight.tar.gz
+```
+
+On macOS, `shasum -a 256 /tmp/midflight.tar.gz` prints the same digest.
+
+`publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch. Users then run `brew update` and `brew upgrade Abeansits/mid-flight/midflight`.
 
 <details>
 <summary><strong>Architecture</strong></summary>
