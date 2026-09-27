@@ -1,39 +1,23 @@
-# Homebrew formula sketch for MidFlight.
-#
-# The Abeansits/mid-flight tap is NOT published yet. From a checkout:
-#
-#   brew install --HEAD --formula ./Formula/midflight.rb
-#
-# After a matching GitHub release exists, add a stable `url` + `sha256` (see
-# comment below) and then `brew install --formula ./Formula/midflight.rb`.
-#
-# Do not advertise `brew tap Abeansits/mid-flight` until that tap exists.
-
 class Midflight < Formula
   desc "On-demand consult with Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude"
   homepage "https://github.com/Abeansits/mid-flight"
+  url "https://github.com/Abeansits/mid-flight/archive/refs/tags/v1.18.0.tar.gz"
+  sha256 "4467ebc1a98cc57f7fa3957742885e69d0f1ec6cb5081ed60441effa9594c75c"
   license "MIT"
   head "https://github.com/Abeansits/mid-flight.git", branch: "main"
-
-  # Stable bottle block — uncomment and fill sha256 when publishing a release:
-  # url "https://github.com/Abeansits/mid-flight/archive/refs/tags/v1.14.0.tar.gz"
-  # sha256 "REPLACE_WITH_TARBALL_SHA256"
-  # version "1.14.0"
 
   depends_on "bash"
 
   def install
-    # Keep repo layout so bin/midflight can resolve ../scripts and plugin.json.
-    libexec.install "bin", "scripts", "commands", "prompts", "hosts", "docs"
-    libexec.install ".claude-plugin"
-    libexec.install "LICENSE", "README.md" if (buildpath/"LICENSE").exist?
-    libexec.install "ROADMAP.md" if (buildpath/"ROADMAP.md").exist?
-
+    libexec.install "bin", "scripts", "commands", "prompts", "hosts", "docs",
+                    ".claude-plugin", "LICENSE", "README.md", "ROADMAP.md"
     chmod 0755, libexec/"bin/midflight"
     bin.install_symlink libexec/"bin/midflight"
   end
 
   test do
-    assert_match(/\d+\.\d+\.\d+/, shell_output("#{bin}/midflight --version"))
+    assert_match(/\Amidflight \d+\.\d+\.\d+\n/, shell_output("#{bin}/midflight --version"))
+    assert_path_exists libexec/"scripts/query.sh"
+    assert_path_exists libexec/".claude-plugin/plugin.json"
   end
 end
