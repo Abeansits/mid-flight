@@ -33,6 +33,8 @@ assert_eq "high" "$(cat "$TEST_DIR/grok_effort.txt")" "grok should receive the c
 assert_eq "plain" "$(cat "$TEST_DIR/grok_output_format.txt")" "grok should request plain output"
 assert_eq "no" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "consult must not pass --always-approve"
+assert_eq "read-only" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
+  "consult grok sandbox should be read-only"
 assert_contains "$(cat "$TEST_DIR/grok_prompt.txt")" \
   "You are a senior engineer being consulted mid-development." \
   "grok prompt should include the consult system prompt"

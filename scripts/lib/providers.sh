@@ -182,8 +182,6 @@ query_agy() {
     args+=(--add-dir "$include_dir")
   fi
 
-  # Headless agy soft-denies writes unless permissions are skipped.
-  # Consult/video stay gated; implement is the only mode that must edit files.
   if [ "${MODE:-}" = "implement" ]; then
     args+=(--dangerously-skip-permissions)
   fi
@@ -281,10 +279,10 @@ query_grok() {
     args+=(--effort "$grok_effort")
   fi
 
-  # Consult and video analysis stay gated. Implement edits files.
-  # Image and video generation call Imagine, so they must auto-approve.
   if [ "${MODE:-}" = "implement" ] || [ "${MODE:-}" = "image-gen" ] || [ "${MODE:-}" = "video-gen" ]; then
     args+=(--always-approve)
+  else
+    args+=(--sandbox read-only)
   fi
 
   grok "${args[@]}" \
@@ -306,9 +304,10 @@ query_claude() {
     args+=(--model "$claude_model")
   fi
 
-  # Consult/video stay gated; implement must skip permission prompts to edit.
   if [ "${MODE:-}" = "implement" ]; then
     args+=(--dangerously-skip-permissions)
+  else
+    args+=(--permission-mode plan)
   fi
 
   claude "${args[@]}" \

@@ -29,5 +29,7 @@ assert_eq "grok-implement-ok" "$output" "implement query should return stubbed g
 assert_eq "" "$(cat "$TEST_DIR/grok_model.txt")" "unset grok_model should omit -m"
 assert_eq "yes" "$(cat "$TEST_DIR/grok_always_approve.txt")" \
   "implement must pass --always-approve so grok can write files"
+assert_eq "" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
+  "implement must not pass --sandbox read-only"
 
 echo "PASS: implement mode always-approves grok and omits empty -m"
