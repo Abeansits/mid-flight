@@ -42,9 +42,24 @@ clip="$TEST_DIR/clip.mp4"
 printf 'mp4\n' > "$clip"
 write_grok_stub "$clip"
 
-output="$(run_cli --video-gen "the plane banks once" --aspect 9:16 --ref "$ref" --ref "$second")"
+set +e
+output="$(run_cli --video-gen "the plane banks once" --aspect 9:16 --ref "$ref" --ref "$second" 2>"$TEST_DIR/video_err.txt")"
+status=$?
+set -e
+if [ "$status" -ne 0 ]; then
+  echo "FAIL: --video-gen with refs should exit 0" >&2
+  echo "Status: $status" >&2
+  echo "Stdout: $output" >&2
+  cat "$TEST_DIR/video_err.txt" >&2
+  exit 1
+fi
 if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
   echo "FAIL: --video-gen with refs should print the saved video" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+if [[ "$output" == *"could not read"* ]] || [[ "$output" == *"midflight:"* ]]; then
+  echo "FAIL: reference diagnostics should stay off stdout" >&2
   echo "Actual: $output" >&2
   exit 1
 fi
@@ -53,7 +68,25 @@ assert_contains "$grok_prompt" "Aspect ratio: 9:16" "the video prompt should nam
 assert_contains "$grok_prompt" "Do not pass aspect_ratio to image_to_video" \
   "a reference clip should not send the ratio to image_to_video"
 assert_contains "$grok_prompt" "opening frame:" "the first reference should be the opening frame"
+assert_contains "$grok_prompt" "Later reference images guide the clip" \
+  "later references should be guidance"
+assert_contains "$grok_prompt" "They do not replace the opening frame" \
+  "later references should not replace the opening frame"
 assert_contains "$grok_prompt" "sky.png" "the second reference should be included"
+# MidFlight lists refs after `cd -P`, so the prompt path is the physical
+# path. On macOS, mktemp lives under /var, which is a symlink to /private/var.
+second_listed="$(cd -P "$(dirname "$second")" && pwd)/$(basename "$second")"
+frame_at="$(awk -v needle="opening frame: " 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
+guide_at="$(awk -v needle="$second_listed" 'index($0, needle) { print NR; exit }' <<<"$grok_prompt")"
+if [ -z "$frame_at" ] || [ -z "$guide_at" ] || [ "$frame_at" -ge "$guide_at" ]; then
+  echo "FAIL: the opening frame should be listed before later references" >&2
+  echo "opening frame line: ${frame_at:-missing}" >&2
+  echo "later reference line: ${guide_at:-missing}" >&2
+  exit 1
+fi
+video_err="$(cat "$TEST_DIR/video_err.txt")"
+assert_contains "$video_err" "could not read the size" \
+  "a text reference should say the opening frame size was not read"
 
 # Usage errors.
 set +e
