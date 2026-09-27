@@ -12,7 +12,7 @@ aspect_codex_size() {
 
 write_media_prompt() {
   local media_prompt_file="$1"
-  local media_prompt refs_file ref ref_index
+  local media_prompt ref ref_index
 
   if [ "$MODE" = "image-gen" ]; then
     media_prompt="$IMAGE_GEN_PROMPT"
@@ -45,6 +45,10 @@ write_media_prompt() {
       done
     fi
   } > "$media_prompt_file"
+}
+
+export_media_refs() {
+  local refs_file
   if [ "${#REFS[@]}" -gt 0 ]; then
     refs_file="$WORKDIR/media-refs.txt"
     printf '%s\n' "${REFS[@]}" > "$refs_file"
@@ -52,7 +56,7 @@ write_media_prompt() {
   fi
 }
 
-resolve_existing_path() {
+physical_path() {
   local target="$1" dir base
   dir="$(cd -P "$(dirname "$target")" && pwd)"
   base="$(basename "$target")"
@@ -162,7 +166,7 @@ last_written_video_path() {
     i=$((i + 1))
   done
   if [ -n "$found" ]; then
-    resolve_existing_path "$found"
+    physical_path "$found"
     return 0
   fi
   return 1
@@ -173,12 +177,12 @@ canonicalize_image_output() {
   trimmed="${body%"${body##*[![:space:]]}"}"
   trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
   if [ -n "$trimmed" ] && written_since_gen_stamp "$trimmed"; then
-    resolve_existing_path "$trimmed"
+    physical_path "$trimmed"
     return 0
   fi
   found="$(last_written_path "$trimmed")"
   if [ -n "$found" ]; then
-    resolve_existing_path "$found"
+    physical_path "$found"
     return 0
   fi
   return 1

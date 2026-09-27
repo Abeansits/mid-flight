@@ -822,6 +822,7 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   fi
   media_prompt_file="$WORKDIR/media-prompt.md"
   write_media_prompt "$media_prompt_file"
+  export_media_refs
   engine_args=("$media_prompt_file" "$MODE")
 elif [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
