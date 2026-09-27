@@ -8,7 +8,7 @@ shell_files=()
 while IFS= read -r shell_file; do
   shell_files+=("$shell_file")
 done < <(find "$ROOT_DIR/scripts" "$ROOT_DIR/tests" "$ROOT_DIR/hosts" -name '*.sh' | sort)
-shell_files+=("$ROOT_DIR/bin/midflight")
+shell_files+=("$ROOT_DIR/bin/midflight" "$ROOT_DIR/bin/media.sh")
 
 if command -v shellcheck >/dev/null 2>&1; then
   echo "==> shellcheck"
