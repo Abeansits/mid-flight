@@ -1,0 +1,113 @@
+# The mf-intake label marks a new issue as intake.
+# Secrets MF_BUILD_WEBHOOK_URL and MF_BUILD_WEBHOOK_KEY wake an mf-build
+# Grok Bot webhook routine. Without those secrets, labeling still works
+# for Cursor Automations and humans.
+
+name: MF intake
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label-and-notify:
+    name: Label mf-intake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add mf-intake label
+        id: label
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const label = "mf-intake";
+            const issue = context.payload.issue;
+            if (!issue || issue.pull_request) {
+              core.notice("Not a non-PR issue; skipping mf-intake.");
+              core.setOutput("notify", "false");
+              return;
+            }
+
+            const current = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+            });
+            const names = (current.data.labels || []).map((item) =>
+              typeof item === "string" ? item : item.name
+            );
+            if (names.includes(label)) {
+              core.notice(
+                `Issue #${issue.number} already has ${label}; leaving it unchanged.`
+              );
+              core.setOutput("notify", "false");
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: [label],
+            });
+            core.info(`Added ${label} to issue #${issue.number}.`);
+            core.setOutput("notify", "true");
+
+      - name: Notify mf-build webhook
+        if: steps.label.outputs.notify == 'true'
+        uses: actions/github-script@v9
+        env:
+          MF_BUILD_WEBHOOK_URL: ${{ secrets.MF_BUILD_WEBHOOK_URL }}
+          MF_BUILD_WEBHOOK_KEY: ${{ secrets.MF_BUILD_WEBHOOK_KEY }}
+        with:
+          script: |
+            const url = (process.env.MF_BUILD_WEBHOOK_URL || "").trim();
+            const key = (process.env.MF_BUILD_WEBHOOK_KEY || "").trim();
+            if (!url || !key) {
+              core.notice(
+                "MF_BUILD_WEBHOOK_URL or MF_BUILD_WEBHOOK_KEY is unset; skipping webhook notify. The mf-intake label was still applied."
+              );
+              return;
+            }
+
+            const issue = context.payload.issue;
+            const maxBody = 8000;
+            const rawBody = issue.body || "";
+            const bodyTruncated = rawBody.length > maxBody;
+            const repository = context.payload.repository || {};
+            const payload = {
+              action: "opened",
+              number: issue.number,
+              html_url: issue.html_url,
+              title: issue.title || "",
+              body: bodyTruncated ? rawBody.slice(0, maxBody) : rawBody,
+              body_truncated: bodyTruncated,
+              user_login: issue.user && issue.user.login ? issue.user.login : "",
+              repo_full_name:
+                repository.full_name ||
+                `${context.repo.owner}/${context.repo.repo}`,
+            };
+
+            // Grok Bot webhook routines expect Bearer auth and X-Automation-Key.
+            const response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${key}`,
+                "X-Automation-Key": key,
+              },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(8000),
+            });
+            if (!response.ok) {
+              const text = (await response.text()).slice(0, 500);
+              core.setFailed(
+                `mf-build webhook returned HTTP ${response.status}. ${text}`
+              );
+              return;
+            }
+            core.info(
+              `Notified mf-build webhook for issue #${issue.number} (HTTP ${response.status}).`
+            );
