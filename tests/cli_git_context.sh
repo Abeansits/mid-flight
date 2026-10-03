@@ -142,17 +142,52 @@ err_both="$(run_cli --git-status --diff 2>&1)"
 ec_both=$?
 set -e
 popd >/dev/null
+assert_no_rejected_hint() {
+  local err="$1"
+  local label="$2"
+  if [[ "$err" == *"--query-file"* || "$err" == *"--video"* ]]; then
+    echo "FAIL: $label should ask for a QUESTION only" >&2
+    echo "Actual: $err" >&2
+    exit 1
+  fi
+}
+
 assert_eq "2" "$ec_alone" "--git-status alone should exit 2"
 assert_contains "$err_alone" "require a QUESTION" \
   "--git-status alone should demand a QUESTION"
+assert_no_rejected_hint "$err_alone" "--git-status alone"
 assert_eq "2" "$ec_diff_alone" "--diff alone should exit 2"
 assert_contains "$err_diff_alone" "require a QUESTION" \
   "--diff alone should demand a QUESTION"
+assert_no_rejected_hint "$err_diff_alone" "--diff alone"
 assert_eq "2" "$ec_both" "--git-status --diff alone should exit 2"
 assert_contains "$err_both" "require a QUESTION" \
   "git flags without QUESTION should be rejected"
+assert_no_rejected_hint "$err_both" "--git-status --diff alone"
 
 echo "PASS: git flags alone require a QUESTION"
+
+# Combinations that the old hint suggested are still rejected.
+printf 'prebuilt question\n' > "$TEST_DIR/query.md"
+set +e
+err_qf="$(run_cli -f "$TEST_DIR/query.md" --git-status 2>&1)"
+ec_qf=$?
+err_vid="$(run_cli --video "$TEST_DIR/nope.mp4" --git-status "q" 2>&1)"
+ec_vid=$?
+err_vid_bare="$(run_cli --video "$TEST_DIR/nope.mp4" --git-status 2>&1)"
+ec_vid_bare=$?
+set -e
+assert_eq "2" "$ec_qf" "--query-file with --git-status should exit 2"
+assert_contains "$err_qf" "--query-file cannot be combined with an inline question, --context, --include, --git-status, or --diff" \
+  "--query-file with --git-status should keep the combination error"
+assert_eq "2" "$ec_vid" "--video with --git-status and a question should exit 2"
+assert_contains "$err_vid" "--context/--include/--git-status/--diff do not apply to video mode; pass the prompt inline" \
+  "--video with --git-status should keep the combination error"
+assert_eq "2" "$ec_vid_bare" "--video with --git-status should exit 2"
+assert_eq "$err_vid" "$err_vid_bare" \
+  "--video with --git-status should use the same combination error with or without a question"
+
+echo "PASS: --query-file and --video still reject git flags"
 
 # --- help lists the new flags ---
 help_output="$(run_cli --help)"
