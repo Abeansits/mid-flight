@@ -134,60 +134,51 @@ TIMEOUT=0  # 0 = no bound by default (preserves pre-timeout behavior & error-pat
 # Per-section cap for --git-status / --diff output (bytes). Override with MIDFLIGHT_GIT_CONTEXT_MAX_BYTES.
 GIT_CONTEXT_MAX_BYTES="${MIDFLIGHT_GIT_CONTEXT_MAX_BYTES:-102400}"
 
+# The next argv word must be a real value. A missing word, an empty word, or
+# another flag (anything starting with -) is a usage error.
+require_option_value() {
+  local noun="$1"
+  shift
+  if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+    die "$1 requires $noun"
+  fi
+  case "$2" in
+    -*) die "$1 requires $noun (got '$2')" ;;
+  esac
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    -m|--mode)       MODE="${2:-}"; shift 2 ;;
-    -p|--provider)   PROVIDER="${2:-}"; shift 2 ;;
+    -m|--mode)       require_option_value "a mode" "$@"; MODE="$2"; shift 2 ;;
+    -p|--provider)   require_option_value "a provider name" "$@"; PROVIDER="$2"; shift 2 ;;
     --dual)
       [ $# -ge 2 ] || die "--dual requires a provider name (usage: midflight --dual PROVIDER \"…\")"
       [ -n "$2" ] || die "--dual requires a provider name (got empty string)"
+      case "$2" in
+        -*) die "--dual requires a provider name (got '$2')" ;;
+      esac
       DUAL_PROVIDER="$2"
       shift 2
       ;;
-    --providers)     PROVIDERS_LIST="${2:-}"; shift 2 ;;
-    --model)         MODEL="${2:-}"; shift 2 ;;
-    -c|--config)     CONFIG_FILE="${2:-}"; shift 2 ;;
-    -f|--query-file) QUERY_FILE="${2:-}"; shift 2 ;;
-    --context)       CONTEXT_FILE="${2:-}"; shift 2 ;;
-    -i|--include)    INCLUDES+=("${2:-}"); shift 2 ;;
+    --providers)     require_option_value "a provider list" "$@"; PROVIDERS_LIST="$2"; shift 2 ;;
+    --model)         require_option_value "a model name" "$@"; MODEL="$2"; shift 2 ;;
+    -c|--config)     require_option_value "a config file" "$@"; CONFIG_FILE="$2"; shift 2 ;;
+    -f|--query-file) require_option_value "a query file" "$@"; QUERY_FILE="$2"; shift 2 ;;
+    --context)       require_option_value "a context file" "$@"; CONTEXT_FILE="$2"; shift 2 ;;
+    -i|--include)    require_option_value "a file or glob" "$@"; INCLUDES+=("$2"); shift 2 ;;
     --git-status)    GIT_STATUS=1; shift ;;
     --diff)          GIT_DIFF=1; shift ;;
-    --video)         VIDEO_SOURCE="${2:-}"; shift 2 ;;
-    --image-gen)
-      [ $# -ge 2 ] || die "--image-gen requires a prompt"
-      [ -n "$2" ] || die "--image-gen requires a prompt"
-      case "$2" in
-        -*) die "--image-gen requires a prompt (got '$2')" ;;
-      esac
-      IMAGE_GEN_PROMPT="$2"
-      shift 2
-      ;;
-    --video-gen)
-      [ $# -ge 2 ] || die "--video-gen requires a prompt"
-      [ -n "$2" ] || die "--video-gen requires a prompt"
-      case "$2" in
-        -*) die "--video-gen requires a prompt (got '$2')" ;;
-      esac
-      VIDEO_GEN_PROMPT="$2"
-      shift 2
-      ;;
-    --ref)
-      [ $# -ge 2 ] || die "--ref requires a file"
-      [ -n "$2" ] || die "--ref requires a file"
-      case "$2" in
-        -*) die "--ref requires a file (got '$2')" ;;
-      esac
-      REFS+=("$2")
-      shift 2
-      ;;
+    --video)         require_option_value "a video file or URL" "$@"; VIDEO_SOURCE="$2"; shift 2 ;;
+    --image-gen)     require_option_value "a prompt" "$@"; IMAGE_GEN_PROMPT="$2"; shift 2 ;;
+    --video-gen)     require_option_value "a prompt" "$@"; VIDEO_GEN_PROMPT="$2"; shift 2 ;;
+    --ref)           require_option_value "a file" "$@"; REFS+=("$2"); shift 2 ;;
     --aspect)
-      [ $# -ge 2 ] || die "--aspect requires a ratio"
-      [ -n "$2" ] || die "--aspect requires a ratio"
+      require_option_value "a ratio" "$@"
       [ -z "$ASPECT" ] || die "--aspect was given twice"
       ASPECT="$2"
       shift 2
       ;;
-    --timeout)       TIMEOUT="${2:-}"; shift 2 ;;
+    --timeout)       require_option_value "a number of seconds" "$@"; TIMEOUT="$2"; shift 2 ;;
     -h|--help)       usage; exit 0 ;;
     -V|--version)    version; exit 0 ;;
     --)              shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
@@ -757,8 +748,8 @@ build_query_file() {
 }
 
 have_inline_input() {
-  # Git flags alone are not enough — they decorate Context but still need a QUESTION
-  # (or --query-file / --video). See the require-QUESTION check below.
+  # Git flags decorate Context and still need a QUESTION. --query-file and
+  # --video reject these flags on their own.
   [ -n "$QUESTION" ] || [ -n "$CONTEXT_FILE" ] || [ "${#INCLUDES[@]}" -gt 0 ]
 }
 
@@ -879,7 +870,7 @@ elif [ -n "$QUERY_FILE" ]; then
   engine_args=("$QUERY_FILE" "$MODE")
 else
   if have_git_flags && [ -z "$QUESTION" ]; then
-    die "--git-status/--diff require a QUESTION (or use --query-file/--video)"
+    die "--git-status/--diff require a QUESTION"
   fi
   have_inline_input || die "no question provided (give a QUESTION, --query-file, or --video)"
   QUERY_OUT=""
