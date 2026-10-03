@@ -56,7 +56,7 @@ Do **not** silently call provider=codex from this host without that override.
 
 3. **Classify intent** — Set `INTENT` to one of:
 
-   - **`video`** — `--video` present. Engine auto-switches to Antigravity/Gemini as needed.
+   - **`video`** — `--video` present. A configured `agy` or `gemini` stays. Otherwise the engine prefers `agy` on PATH, else Gemini.
    - **`consult`** — Questions, tradeoffs, debugging, architecture validation. **When uncertain, default to consult.**
    - **`implement`** — Precise, actionable file-change instructions only.
 
@@ -123,7 +123,7 @@ midflight --dual agy "should we use SSE or WebSockets?"
 # or explicit: midflight --providers codex,agy "…"
 ```
 
-Consult-only in v1. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
+Consult-only. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
 
 ## When to self-invoke
 
