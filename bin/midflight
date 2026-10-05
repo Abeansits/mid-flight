@@ -785,9 +785,14 @@ run_engine() {
       pg=$!
       exec 3>&2
       (
-        # A signaled sleep returns non-zero. Exit before printf so a kill that
-        # stops sleep and leaves this shell alive cannot report a false timeout.
-        sleep '"$to"' || exit 0
+        # A group kill aborts this sleep and resumes the shell at the next
+        # command, so "sleep || exit" never runs. SECONDS in this subshell is
+        # not seconds-since-sleep on macOS bash 3.2, so the gate uses the wall
+        # clock. A killed sleep does not consume the interval.
+        start=$(date +%s)
+        sleep '"$to"'
+        now=$(date +%s)
+        [ $((now - start)) -ge '"$to"' ] || exit 0
         printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
         kill -TERM -"$pg" 2>/dev/null || true
         sleep 1
