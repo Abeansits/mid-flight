@@ -174,6 +174,7 @@ printf '%s' "\$effort" > "$TEST_DIR/grok_effort.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/grok_output_format.txt"
 printf '%s' "\$always_approve" > "$TEST_DIR/grok_always_approve.txt"
 printf '%s' "\$sandbox" > "$TEST_DIR/grok_sandbox.txt"
+printf '%s' "\${GROK_HOME-}" > "$TEST_DIR/grok_home.txt"
 ${refresh}
 printf '%s\n' "$response"
 EOF

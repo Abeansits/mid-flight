@@ -298,6 +298,7 @@ query_grok() {
   local full_prompt="$1"
   local output_file="$2"
   local args=(-p "$full_prompt" --output-format plain)
+  local resolved_grok_home=""
 
   prepare_provider_run \
     "grok" \
@@ -318,9 +319,24 @@ query_grok() {
     args+=(--sandbox read-only)
   fi
 
-  grok "${args[@]}" \
-    > "$output_file" \
-    2> "$PROVIDER_LOG_FILE"
+  # A temp HOME (build_config_home, or a host override) symlinks ~/.grok at
+  # the real directory. Grok's read-only sandbox refuses a symlinked
+  # GROK_HOME, so pass that directory's canonical path to this process only.
+  # An already-set GROK_HOME is left alone. CDPATH would make cd print the
+  # destination and pollute the captured path.
+  if [ -z "${GROK_HOME+x}" ] && [ -n "${HOME:-}" ] && [ -L "$HOME/.grok" ] && [ -d "$HOME/.grok" ]; then
+    resolved_grok_home="$(CDPATH='' cd "$HOME/.grok" 2>/dev/null && pwd -P)" || resolved_grok_home=""
+  fi
+
+  if [ -n "$resolved_grok_home" ] && [ ! -L "$resolved_grok_home" ] && [ -d "$resolved_grok_home" ]; then
+    GROK_HOME="$resolved_grok_home" grok "${args[@]}" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  else
+    grok "${args[@]}" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  fi
 }
 
 query_claude() {
