@@ -70,6 +70,7 @@ classify_provider_failure() {
   local excerpt=""
   local log_text=""
   local normalized=""
+  local socket_path=""
 
   provider_label="$(provider_display_name "$provider_name")"
   excerpt="$(provider_error_excerpt "$log_file")"
@@ -88,6 +89,38 @@ classify_provider_failure() {
     *"rate limit"*|*rate_limit*|*"too many requests"*|*"quota exceeded"*|*"resource exhausted"*|*"status 429"*|*"error 429"*)
       PROVIDER_FAILURE_DETAIL="${provider_name} rate limited"
       PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} hit a rate limit or quota. Wait a bit, then try again.${excerpt}"
+      ;;
+    *"runtime-socket deny path"*"endpoint is a symlink"*|*"socket deny resolution failed"*"endpoint is a symlink"*|*"sandbox could not be applied"*"endpoint is a symlink"*)
+      # Grok refuses --sandbox read-only when a runtime socket (Docker Desktop's
+      # /var/run/docker.sock) is still a symlink. That warning contains
+      # "could not resolve", which is not a DNS failure.
+      case "$log_text" in
+        *"runtime-socket deny path "*)
+          socket_path="${log_text#*"runtime-socket deny path "}"
+          socket_path="${socket_path%%:*}"
+          ;;
+        *)
+          case "$normalized" in
+            *"runtime-socket deny path "*)
+              socket_path="${normalized#*"runtime-socket deny path "}"
+              socket_path="${socket_path%%:*}"
+              ;;
+          esac
+          ;;
+      esac
+      case "$socket_path" in
+        /*) ;;
+        *) socket_path="" ;;
+      esac
+      case "$socket_path" in
+        *[[:space:]]*) socket_path="" ;;
+      esac
+      PROVIDER_FAILURE_DETAIL="${provider_name} sandbox refusal"
+      if [ -n "$socket_path" ]; then
+        PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} refused to start the read-only sandbox because a runtime socket path is a symlink (\"${socket_path}\").${excerpt}"
+      else
+        PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} refused to start the read-only sandbox because a runtime socket path is a symlink.${excerpt}"
+      fi
       ;;
     *"timed out"*|*timeout*|*"network error"*|*"connection reset"*|*"connection refused"*|*"could not resolve"*|*"temporary failure in name resolution"*|*enotfound*|*econnreset*|*dns*)
       PROVIDER_FAILURE_DETAIL="${provider_name} network error"
@@ -265,6 +298,7 @@ query_grok() {
   local full_prompt="$1"
   local output_file="$2"
   local args=(-p "$full_prompt" --output-format plain)
+  local resolved_grok_home=""
 
   prepare_provider_run \
     "grok" \
@@ -285,9 +319,24 @@ query_grok() {
     args+=(--sandbox read-only)
   fi
 
-  grok "${args[@]}" \
-    > "$output_file" \
-    2> "$PROVIDER_LOG_FILE"
+  # A temp HOME (build_config_home, or a host override) symlinks ~/.grok at
+  # the real directory. Grok's read-only sandbox refuses a symlinked
+  # GROK_HOME, so pass that directory's canonical path to this process only.
+  # An already-set GROK_HOME is left alone. CDPATH would make cd print the
+  # destination and pollute the captured path.
+  if [ -z "${GROK_HOME+x}" ] && [ -n "${HOME:-}" ] && [ -L "$HOME/.grok" ] && [ -d "$HOME/.grok" ]; then
+    resolved_grok_home="$(CDPATH='' cd "$HOME/.grok" 2>/dev/null && pwd -P)" || resolved_grok_home=""
+  fi
+
+  if [ -n "$resolved_grok_home" ] && [ ! -L "$resolved_grok_home" ] && [ -d "$resolved_grok_home" ]; then
+    GROK_HOME="$resolved_grok_home" grok "${args[@]}" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  else
+    grok "${args[@]}" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  fi
 }
 
 query_claude() {

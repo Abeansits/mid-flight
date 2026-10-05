@@ -24,7 +24,7 @@ midflight --dual agy "should we use SSE or WebSockets?"
 # or explicit: midflight --providers codex,agy "…"
 ```
 
-Consult-only in v1. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
+Consult-only. Hosts do not need a separate dual UX; run the CLI (or tell the user to) and present both labeled sections.
 
 ## Your job
 

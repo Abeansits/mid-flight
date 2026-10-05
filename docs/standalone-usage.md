@@ -1,19 +1,20 @@
 # Standalone CLI usage
 
-`bin/midflight` is a thin wrapper over MidFlight's engine (`scripts/query.sh`)
-that lets you consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any
-terminal, script, or CI job — without Claude Code.
+`bin/midflight` is the terminal front door. It parses arguments, assembles a
+query, and calls the engine (`scripts/query.sh`) so you can consult Codex,
+Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from a terminal, script, or
+CI job. Host skills call the same engine.
 
-The engine was always standalone; this wrapper just adds friendly argument
-parsing, help/version output, and inline-question assembly. The Claude Code
-plugin behavior is unchanged.
+`midflight --help` is the short calling contract (exit codes, streams, stdout
+shape, `-p` limits). This guide is the longer one: install, how a query is
+built, and sandbox limits.
 
 ## What it does (and doesn't) do
 
 Inside Claude Code, `/midflight` writes the context summary for you because
 Claude already has the full session. From the terminal there is no session to
 summarize, so **you** supply the question and any context you want to include.
-The wrapper assembles a `## Context` / `## Question` query file from what you
+The CLI assembles a `## Context` / `## Question` query file from what you
 pass and hands it to the engine — it does not call a model to summarize for you.
 
 ## Install
@@ -73,7 +74,7 @@ midflight --video-gen PROMPT
   -i, --include GLOB     read matching files into the Context section (repeatable)
       --git-status       append current branch + `git status` under Context
       --diff             append `git diff` (working tree) and staged diff under Context
-      --video FILE|URL   analyze a video (forces video mode + agy or Gemini)
+      --video FILE|URL   analyze a video (keeps agy or gemini; else agy on PATH, else Gemini)
       --image-gen PROMPT generate one image with Grok or Codex and print the file path
       --video-gen PROMPT generate one video with Grok and print the file path.
                          Asks for 720p when image_to_video lists resolution_name.
@@ -81,14 +82,16 @@ midflight --video-gen PROMPT
       --ref FILE         reference image for --image-gen or --video-gen (repeatable).
                          On a video, the first file is the opening frame and sets the shape.
       --aspect RATIO     1:1, 16:9, 9:16, 3:2, or 2:3.
-                         On a video, a first --ref with a different shape is an error.
+                         On a video, a readable PNG or JPEG that conflicts
+                         with --aspect exits 2. An unreadable frame warns
+                         on stderr and continues.
       --timeout SECONDS  hard bound on each provider call (default off; N>0 enables
                          portable watchdog + pg kill; dual ≈ 2N wall)
   -h, --help             show help
   -V, --version          show version
 ```
 
-Consult passes a read-only flag only when that CLI has one MidFlight can trust for a single run. Codex uses `--sandbox read-only`. Grok uses `--sandbox read-only`. Project writes are blocked, and `~/.grok` and temp stay writable. Claude uses `--permission-mode plan`. Implement uses Codex `--sandbox workspace-write`, Grok `--always-approve` with the sandbox left off, and `--dangerously-skip-permissions` for Antigravity and Claude. Image generation and video generation stay writable.
+Consult passes a read-only flag only when that CLI has one MidFlight can trust for a single run. Codex uses `--sandbox read-only`. Grok uses `--sandbox read-only`. Docker Desktop's symlinked `/var/run/docker.sock` makes `grok --sandbox read-only` refuse to start, and MidFlight consult does not fall back to an unsandboxed run. That layout blocks Grok consult until Grok accepts the symlink. Project writes are blocked, and `~/.grok` and temp stay writable. Claude uses `--permission-mode plan`. Implement uses Codex `--sandbox workspace-write`, Grok `--always-approve` with the sandbox left off, and `--dangerously-skip-permissions` for Antigravity and Claude. Image generation and video generation stay writable.
 
 Antigravity, Gemini, OpenCode, and Oz consults do not get a read-only flag. Antigravity headless mode auto-allows workspace file writes even when `--dangerously-skip-permissions` is omitted. For those providers the consult prompt is an instruction, and writes follow that CLI's permission settings. Limits are in the README section [Consult and file writes](../README.md#consult-and-file-writes).
 
@@ -109,7 +112,7 @@ Explicit form (names both sides):
 midflight --providers codex,agy "should we use SSE or WebSockets?"
 ```
 
-Rules for v1:
+Rules:
 
 - **Consult-only** — `--dual` / `--providers` refuse `implement`, `video`, `--image-gen`, and `--video-gen` with a clear usage error.
 - Sequential engine runs (same assembled query file / `--query-file`).
@@ -165,7 +168,7 @@ midflight -i "src/auth/*.ts" -i "README.md" "is the token TTL sane?"
 # Implementation delegation
 midflight -m implement -f request.md
 
-# Video analysis (auto-switches to Gemini regardless of config)
+# Video analysis (keeps agy or gemini; otherwise agy on PATH, else Gemini)
 midflight --video ./ad-v3.mp4 "does this match the storyboard we discussed?"
 midflight --video https://youtube.com/watch?v=abc123
 
@@ -189,12 +192,18 @@ midflight -f query.md
 - **`--query-file FILE`** — passed to the engine untouched (full compatibility
   with the existing `scripts/query.sh` contract). Cannot be combined with an
   inline question, `--context`, `--include`, `--git-status`, or `--diff`.
-- **`--video FILE|URL`** — forces video mode and Gemini. Trailing text is the
-  prompt; with no prompt the engine uses its default scene-breakdown prompt.
+- **`--video FILE|URL`** — forces video mode. A configured or `-p` provider of
+  `agy` or `gemini` stays. Any other provider prefers `agy` on `PATH`, else
+  Gemini. Trailing text is the prompt; with no prompt the engine uses its
+  default scene-breakdown prompt.
+- **Stdin** — ignored. `echo question | midflight` exits 2 (`midflight: …` on
+  stderr, empty stdout). Pass the question as arguments. `--` ends options, so
+  a question that starts with `-` is `midflight -- -question`.
 - **`--image-gen PROMPT`** — generates one image and prints the saved file path.
   Grok and Codex are the providers. With no `-p`, a config provider of `grok`
   or `codex` is kept; any other config uses `grok` when that CLI is on `PATH`,
-  otherwise Codex. The prompt is the image description. `--video` stays analysis.
+  otherwise Codex when that CLI is on `PATH`, otherwise `grok`. The prompt is
+  the image description. `--video` stays analysis.
 - **`--video-gen PROMPT`** — generates one video with Grok and prints the saved
   file path. `-p` must be `grok` when it is passed. With no `-p`, a `grok`
   config is kept; any other config uses Grok. `--video` stays analysis.
@@ -220,7 +229,7 @@ midflight -f query.md
 ## Provider and config overrides
 
 `-p/--provider`, `--model`, and `-c/--config` let you change the provider, model,
-or config for a single call without editing your real config. The wrapper composes
+or config for a single call without editing your real config. The CLI composes
 an effective config in a temporary home and points the engine at it, while symlinking
 the rest of your home directory through so provider CLIs keep their authentication.
 Your `~/.config/mid-flight/config` is never modified.
@@ -231,17 +240,25 @@ Your `~/.config/mid-flight/config` is never modified.
 - `-p agy --model gemini-3.1-pro-high` → sets `agy_model`
 - `--model gemini-3.8-flash` (no `-p`) → sets the model for whatever provider is
   active in your config
-- `--video clip.mp4 --model gemini-3.8-flash` → sets `agy_model` and
-  `gemini_model`; video picks agy if present, else Gemini
+- `--video clip.mp4 --model gemini-3.8-flash` (no `-p`) → sets `agy_model` and
+  `gemini_model`. A configured `agy` or `gemini` stays; otherwise video prefers
+  `agy` on `PATH`, else Gemini
 
 ## Exit codes
 
-- `0` — success (provider response on stdout; `[mid-flight]` logs on stderr).
-- `2` — usage error (bad mode, missing question, conflicting flags, missing
-  files passed to `--context`/`--config`/`--query-file`, dual-consult misuse
-  (implement/video, same provider twice, `--dual`+`--providers`, `--model` with
-  dual), or `--git-status`/`--diff` used outside a git work tree / without `git`
-  on PATH).
-- `1` — engine/provider error (missing provider CLI, invalid config, auth or
-  network failure), including dual-consult when either side fails (successful
-  side still printed). Single-provider messages come straight from the engine.
+- `0` — success. The provider reply is on stdout. `[mid-flight]` logs are on
+  stderr. `--image-gen` and `--video-gen` print one absolute path.
+- `2` — usage error. The line is `midflight: …` on stderr and stdout is empty.
+  That covers a bad mode, a missing question, conflicting flags, missing files
+  passed to `--context` / `--config` / `--query-file`, dual-consult misuse
+  (implement, video, image-gen, video-gen, the same provider twice,
+  `--dual` with `--providers`, `--model` with dual, an unknown dual name),
+  `--git-status` / `--diff` outside a git work tree or without `git` on `PATH`,
+  a readable PNG or JPEG opening frame that conflicts with `--aspect`, and an
+  `-p` value `--image-gen` or `--video-gen` rejects.
+- `1` — engine or provider error. `Error: …` is on stdout and `[mid-flight]`
+  logs are on stderr. That covers a missing provider CLI, invalid config
+  (including an unknown `-p` on a single consult), auth or network failure,
+  and dual-consult when either side fails (the other answer is still printed).
+  If image or video generation runs and saves no new file, exit 1 and the
+  note is on stderr.

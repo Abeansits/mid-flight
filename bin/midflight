@@ -27,6 +27,9 @@ PROJECT_ROOT="$(cd "$BIN_DIR/.." && pwd)"
 QUERY_SH="$PROJECT_ROOT/scripts/query.sh"
 PLUGIN_JSON="$PROJECT_ROOT/.claude-plugin/plugin.json"
 
+# shellcheck source=media.sh
+source "$BIN_DIR/media.sh"
+
 die() {
   printf 'midflight: %s\n' "$1" >&2
   exit "${2:-2}"
@@ -51,6 +54,34 @@ Usage:
   midflight --video-gen PROMPT
   midflight -f QUERY_FILE [OPTIONS]
 
+Calling contract:
+  Exit 0: provider reply on stdout. [mid-flight] logs on stderr.
+  Exit 2: usage error. midflight: … on stderr, empty stdout.
+  Exit 1: engine or provider error. Error: … on stdout, [mid-flight] logs
+          on stderr. Dual exits 1 if either side fails; the other answer
+          is still printed.
+  Consult stdout is the reply. Dual stdout is ## Provider A: <name>,
+          ## Provider B: <name>, then ## Where they differ. MidFlight does
+          not merge the answers.
+  --image-gen and --video-gen stdout is one absolute path. Exit 1 when no
+          new file was saved; that note is on stderr.
+  Default provider is codex when config has no provider=.
+  -p on --image-gen must be codex or grok. -p on --video-gen must be grok.
+          Aliases: antigravity → agy, grok-build → grok.
+  --video keeps agy or gemini (config or -p). Any other provider prefers
+          agy on PATH, else Gemini. --image-gen keeps grok or codex; any
+          other uses grok on PATH, else Codex on PATH, else grok.
+          --video-gen keeps grok; any other provider is overridden to grok.
+  Unknown --dual or --providers names exit 2. Unknown -p on one consult
+          is exit 1 (Error: invalid config).
+  Exit 2 when --query-file is combined with a question, --context, -i,
+          --git-status, or --diff. Those flags do not apply to --video,
+          --image-gen, or --video-gen.
+  Stdin is ignored. -- ends options (a question that starts with - needs it).
+  Implement can write the workspace. Codex, Grok, and Claude consults are
+          read-only. Antigravity, Gemini, OpenCode, and Oz follow that CLI's
+          permission settings. Sandbox details: docs/standalone-usage.md.
+
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
@@ -63,7 +94,7 @@ Options:
   -i, --include GLOB     read matching files into the Context section (repeatable)
       --git-status        append current branch + git status under Context
       --diff              append git diff (working tree) and staged diff under Context
-      --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
+      --video FILE|URL    analyze a video (keeps agy or gemini; else agy on PATH, else Gemini)
       --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
       --video-gen PROMPT  generate one video with Grok; prints the file path.
                           Asks for 720p when image_to_video lists resolution_name.
@@ -71,19 +102,18 @@ Options:
       --ref FILE          reference image for --image-gen or --video-gen (repeatable).
                           On a video, the first file is the opening frame and sets the shape.
       --aspect RATIO      1:1, 16:9, 9:16, 3:2, or 2:3.
-                          On a video, a first --ref with a different shape is an error.
-      --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
-                          wrapper owns a portable bash watchdog + process-group kill
-                          so provider children die too; no coreutils needed; dual ≈ 2N wall)
+                          On a video, a readable PNG or JPEG that conflicts
+                          with --aspect exits 2. An unreadable frame warns
+                          on stderr and continues.
+      --timeout SECONDS   hard bound on each provider call (default off; dual ≈ 2N wall)
   -h, --help             show this help
   -V, --version          show version
 
-Dual-consult (--dual / --providers): same question to two providers, print both
-answers and a light structural note. Consult-only in v1 (refuse implement/video).
-Primary UX: midflight --dual agy "…" (primary from config or -p). Explicit form:
-midflight --providers codex,agy "…". Sequential; if one fails, the other is still
-shown. MidFlight does not synthesize a merged opinion. --timeout applies per side
-(~2N wall-clock for dual).
+Dual-consult (--dual / --providers) is consult-only. Same question, both
+answers, no merged opinion. Primary: midflight --dual agy "…" (primary from
+config or -p). Explicit: midflight --providers codex,agy "…". Sequential;
+if one fails, the other is still shown. --timeout applies per side
+(~2N wall-clock).
 
 Git context (--git-status / --diff) is capped at 100 KiB (102400 bytes) per
 section. Raise via MIDFLIGHT_GIT_CONTEXT_MAX_BYTES. Requires a git repo and git
@@ -106,8 +136,8 @@ Examples:
   midflight --video-gen "the paper plane banks once and levels out"
   midflight --image-gen "a paper plane over a fjord" --aspect 16:9 --ref plane.png
 
-The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
-see the project README for configuration details.
+The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH.
+Configuration: project README. Sandbox details: docs/standalone-usage.md.
 EOF
 }
 
@@ -241,18 +271,6 @@ if [ -n "$ASPECT" ]; then
     *) die "--aspect must be 1:1, 16:9, 9:16, 3:2, or 2:3 (got '$ASPECT')" ;;
   esac
 fi
-
-# Codex image_gen takes pixels. These five match the ratios above and stay
-# on a 16px grid, which gpt-image-2 requires.
-aspect_codex_size() {
-  case "$1" in
-    1:1) printf '%s\n' "1024x1024" ;;
-    16:9) printf '%s\n' "1536x864" ;;
-    9:16) printf '%s\n' "864x1536" ;;
-    3:2) printf '%s\n' "1536x1024" ;;
-    2:3) printf '%s\n' "1024x1536" ;;
-  esac
-}
 
 if [ "${#REFS[@]}" -gt 0 ]; then
   resolved_refs=()
@@ -776,9 +794,14 @@ run_engine() {
       pg=$!
       exec 3>&2
       (
-        # A signaled sleep returns non-zero. Exit before printf so a kill that
-        # stops sleep and leaves this shell alive cannot report a false timeout.
-        sleep '"$to"' || exit 0
+        # A group kill aborts this sleep and resumes the shell at the next
+        # command, so "sleep || exit" never runs. SECONDS in this subshell is
+        # not seconds-since-sleep on macOS bash 3.2, so the gate uses the wall
+        # clock. A killed sleep does not consume the interval.
+        start=$(date +%s)
+        sleep '"$to"'
+        now=$(date +%s)
+        [ $((now - start)) -ge '"$to"' ] || exit 0
         printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
         kill -TERM -"$pg" 2>/dev/null || true
         sleep 1
@@ -808,11 +831,9 @@ declare -a engine_args
 if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   if [ "$MODE" = "image-gen" ]; then
     media_flag="--image-gen"
-    media_prompt="$IMAGE_GEN_PROMPT"
     media_noun="image description"
   else
     media_flag="--video-gen"
-    media_prompt="$VIDEO_GEN_PROMPT"
     media_noun="video description"
   fi
   [ -z "$QUERY_FILE" ] || die "$media_flag cannot be combined with --query-file"
@@ -823,36 +844,8 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
     die "pass the $media_noun to $media_flag, not as a separate question"
   fi
   media_prompt_file="$WORKDIR/media-prompt.md"
-  {
-    printf '%s\n' "$media_prompt"
-    if [ -n "$ASPECT" ]; then
-      printf '\nAspect ratio: %s\n' "$ASPECT"
-      if [ "$MODE" = "image-gen" ]; then
-        printf 'Codex size: %s\n' "$(aspect_codex_size "$ASPECT")"
-      elif [ "${#REFS[@]}" -gt 0 ]; then
-        printf '%s\n' "The opening frame already exists. Do not pass aspect_ratio to image_to_video."
-      else
-        printf '%s\n' "Set this ratio on the source still with image_gen. Do not pass aspect_ratio to image_to_video."
-      fi
-    fi
-    if [ "${#REFS[@]}" -gt 0 ]; then
-      printf '\nReference images:\n'
-      ref_index=0
-      for ref in "${REFS[@]}"; do
-        if [ "$MODE" = "video-gen" ] && [ "$ref_index" -eq 0 ]; then
-          printf -- '- opening frame: %s\n' "$ref"
-        else
-          printf -- '- %s\n' "$ref"
-        fi
-        ref_index=$((ref_index + 1))
-      done
-    fi
-  } > "$media_prompt_file"
-  if [ "${#REFS[@]}" -gt 0 ]; then
-    refs_file="$WORKDIR/media-refs.txt"
-    printf '%s\n' "${REFS[@]}" > "$refs_file"
-    export MIDFLIGHT_REFS_FILE="$refs_file"
-  fi
+  write_media_prompt "$media_prompt_file"
+  export_media_refs
   engine_args=("$media_prompt_file" "$MODE")
 elif [ "$MODE" = "video" ]; then
   [ -n "$VIDEO_SOURCE" ] || die "video mode requires --video FILE|URL"
@@ -959,148 +952,6 @@ if [ "$want_dual" -eq 1 ]; then
   fi
   exit 1
 fi
-
-# Resolve a path that exists right now. cd -P follows the temp-HOME symlink
-# into the real ~/.grok (or ~/.codex) before this process deletes the temp dir.
-resolve_existing_path() {
-  local target="$1" dir base
-  dir="$(cd -P "$(dirname "$target")" && pwd)"
-  base="$(basename "$target")"
-  printf '%s\n' "$dir/$base"
-}
-
-# Drop a trailing period or comma the model glues onto a path.
-strip_path_punctuation() {
-  local candidate="$1" lastchar
-  while [ -n "$candidate" ]; do
-    lastchar="${candidate#"${candidate%?}"}"
-    case "$lastchar" in
-      "."|","|":"|";") candidate="${candidate%?}" ;;
-      *) break ;;
-    esac
-  done
-  printf '%s\n' "$candidate"
-}
-
-written_since_gen_stamp() {
-  local file="$1"
-  if [ -z "${GEN_STAMP:-}" ] || [ ! -f "$GEN_STAMP" ] || [ ! -f "$file" ]; then
-    return 1
-  fi
-  if [ "$file" -ef "$GEN_STAMP" ]; then
-    return 1
-  fi
-  # Strictly newer. An equal whole-second mtime is a pre-existing file.
-  [ "$file" -nt "$GEN_STAMP" ]
-}
-
-last_written_path() {
-  local text="$1" i len rest candidate found=""
-  case "$text" in
-    \"*\") text="${text#\"}"; text="${text%\"}" ;;
-    \'*\') text="${text#\'}"; text="${text%\'}" ;;
-  esac
-  len=${#text}
-  i=0
-  while [ "$i" -lt "$len" ]; do
-    rest="${text:$i}"
-    case "$rest" in
-      /*)
-        candidate="$rest"
-        while [ -n "$candidate" ]; do
-          candidate="$(strip_path_punctuation "$candidate")"
-          case "$candidate" in
-            *\"|*\') candidate="${candidate%?}"; continue ;;
-          esac
-          if written_since_gen_stamp "$candidate"; then
-            found="$candidate"
-            break
-          fi
-          candidate="${candidate%?}"
-        done
-        ;;
-    esac
-    i=$((i + 1))
-  done
-  printf '%s\n' "$found"
-}
-
-is_video_file() {
-  local base
-  base="$(basename "$1")"
-  case "$base" in
-    *.mp4|*.MP4|*.mov|*.MOV|*.webm|*.WEBM|*.m4v|*.M4V|*.mkv|*.MKV) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-is_reference_file() {
-  local candidate="$1" ref
-  [ "${#REFS[@]}" -gt 0 ] || return 1
-  for ref in "${REFS[@]}"; do
-    if [ "$candidate" -ef "$ref" ]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Last saved video in the reply. A reference image the model mentions does
-# not count, even when that file exists.
-last_written_video_path() {
-  local text="$1" i len rest candidate found=""
-  case "$text" in
-    \"*\") text="${text#\"}"; text="${text%\"}" ;;
-    \'*\') text="${text#\'}"; text="${text%\'}" ;;
-  esac
-  len=${#text}
-  i=0
-  while [ "$i" -lt "$len" ]; do
-    rest="${text:$i}"
-    case "$rest" in
-      /*)
-        candidate="$rest"
-        while [ -n "$candidate" ]; do
-          candidate="$(strip_path_punctuation "$candidate")"
-          case "$candidate" in
-            *\"|*\') candidate="${candidate%?}"; continue ;;
-          esac
-          if written_since_gen_stamp "$candidate" && is_video_file "$candidate" && ! is_reference_file "$candidate"; then
-            found="$candidate"
-            break
-          fi
-          candidate="${candidate%?}"
-        done
-        ;;
-    esac
-    i=$((i + 1))
-  done
-  if [ -n "$found" ]; then
-    resolve_existing_path "$found"
-    return 0
-  fi
-  return 1
-}
-
-# -p/--model/--config runs the engine under a temp HOME so the real config
-# stays untouched. The model sometimes prints a sentence plus a path inside
-# that temp HOME.
-# Return 1 when the reply names no saved file.
-canonicalize_image_output() {
-  local body="$1" trimmed found
-  trimmed="${body%"${body##*[![:space:]]}"}"
-  trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
-  if [ -n "$trimmed" ] && written_since_gen_stamp "$trimmed"; then
-    resolve_existing_path "$trimmed"
-    return 0
-  fi
-  found="$(last_written_path "$trimmed")"
-  if [ -n "$found" ]; then
-    resolve_existing_path "$found"
-    return 0
-  fi
-  return 1
-}
 
 if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   media_out="$WORKDIR/media-gen.out"
