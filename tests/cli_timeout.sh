@@ -101,42 +101,55 @@ exit 7
 STUB
 chmod +x "$TEST_DIR/bin/codex"
 
-set +e
-start=$(date +%s)
-output="$(run_cli --timeout 3 "test failure propagation" 2>&1)"
-status=$?
-end=$(date +%s)
-set -e
-elapsed=$(( end - start ))
-assert_eq "1" "$status" "provider failure under --timeout must exit 1"
-assert_contains "$output" "provider exploded" "provider error should be visible"
-assert_contains "$output" "Codex query failed" "engine should report the provider failure"
-if echo "$output" | grep -q 'timed out'; then
-  echo "FAIL: a fast provider failure must not be reported as a timeout" >&2
-  exit 1
-fi
-if [ "$elapsed" -gt 2 ]; then
-  echo "FAIL: fast provider failure under --timeout 3 took ${elapsed}s" >&2
-  exit 1
-fi
+# One shot hides the macOS bash 3.2 race (about half of main pushes after #54).
+fast_round=0
+while [ "$fast_round" -lt 20 ]; do
+  fast_round=$((fast_round + 1))
+
+  set +e
+  start=$(date +%s)
+  output="$(run_cli --timeout 3 "test failure propagation" 2>&1)"
+  status=$?
+  end=$(date +%s)
+  set -e
+  elapsed=$(( end - start ))
+  assert_eq "1" "$status" "provider failure under --timeout must exit 1 (round $fast_round)"
+  assert_contains "$output" "provider exploded" "provider error should be visible (round $fast_round)"
+  assert_contains "$output" "Codex query failed" "engine should report the provider failure (round $fast_round)"
+  if echo "$output" | grep -q 'timed out'; then
+    echo "FAIL: a fast provider failure must not be reported as a timeout (round $fast_round)" >&2
+    exit 1
+  fi
+  if [ "$elapsed" -gt 2 ]; then
+    echo "FAIL: fast provider failure under --timeout 3 took ${elapsed}s (round $fast_round)" >&2
+    exit 1
+  fi
+
+  # A provider that finishes inside the deadline stays success, with no timeout line.
+  write_codex_stub "fast-ok"
+  set +e
+  output="$(run_cli --timeout 3 "quick success under timeout?" 2>&1)"
+  status=$?
+  set -e
+  assert_eq "0" "$status" "provider that finishes before the deadline should exit 0 (round $fast_round)"
+  assert_contains "$output" "fast-ok" "successful provider output should be printed (round $fast_round)"
+  if echo "$output" | grep -q 'timed out'; then
+    echo "FAIL: success before the deadline must not print a timeout (round $fast_round)" >&2
+    exit 1
+  fi
+
+  cat > "$TEST_DIR/bin/codex" <<'STUB'
+#!/bin/bash
+echo "provider exploded" >&2
+exit 7
+STUB
+  chmod +x "$TEST_DIR/bin/codex"
+done
 
 set +e
 output="$(run_cli "test failure propagation" 2>&1)"
 status=$?
 set -e
 assert_eq "1" "$status" "provider failure without --timeout must exit 1"
-
-# A provider that finishes inside the deadline stays success, with no timeout line.
-write_codex_stub "fast-ok"
-set +e
-output="$(run_cli --timeout 3 "quick success under timeout?" 2>&1)"
-status=$?
-set -e
-assert_eq "0" "$status" "provider that finishes before the deadline should exit 0"
-assert_contains "$output" "fast-ok" "successful provider output should be printed"
-if echo "$output" | grep -q 'timed out'; then
-  echo "FAIL: success before the deadline must not print a timeout" >&2
-  exit 1
-fi
 
 echo "PASS: --timeout kills slow provider ~on deadline, nonzero exit, clean message, no noise"

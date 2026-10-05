@@ -788,39 +788,44 @@ run_engine() {
     # kill on timeout, visible msg, nonzero exit, and no "Terminated" noise from
     # *our* sleeper on happy path (redirect + explicit reap; engine may still
     # print its own internal job noise when we nuke the provider call).
+    # The timeout line is printed here, not in the sleeper. On macOS bash 3.2
+    # a group kill (including SIGKILL) can reap sleep and leave that shell
+    # alive; it then runs the next command. That command used to be printf,
+    # so the line won the race. A flag created only after an undisturbed
+    # sleep, and read before we signal the sleeper, cannot.
+    local flag="$WORKDIR/timeout-flag"
+    rm -f "$flag"
     bash -c '
       set -m
+      flag=$1
+      shift
       "$@" &
       pg=$!
-      exec 3>&2
       (
-        # A group kill aborts this sleep and resumes the shell at the next
-        # command, so "sleep || exit" never runs. SECONDS in this subshell is
-        # not seconds-since-sleep on macOS bash 3.2, so the gate uses the wall
-        # clock. A killed sleep does not consume the interval.
-        start=$(date +%s)
         sleep '"$to"'
-        now=$(date +%s)
-        [ $((now - start)) -ge '"$to"' ] || exit 0
-        printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
+        : > "$flag"
         kill -TERM -"$pg" 2>/dev/null || true
         sleep 1
         kill -9 -"$pg" 2>/dev/null || true
-        # Force the parent (-c) to die nonzero so caller sees failure even if
-        # the killed QUERY_SH script would have exited 0.
-        kill -TERM $PPID 2>/dev/null || true
-      ) 3>&2 >/dev/null 2>&1 &
+      ) >/dev/null 2>&1 &
       k=$!
       # `|| true` would make $? the status of true, so a provider that
       # exits before the deadline (or is killed by it) would look like success.
       ec=0
       wait "$pg" 2>/dev/null || ec=$?
-      # Kill the watchdog group, not only the subshell. Otherwise its sleep
-      # keeps running and this shell waits out the rest of the deadline.
-      kill -TERM -"$k" 2>/dev/null || true
+      timed_out=0
+      [ -f "$flag" ] && timed_out=1
+      # Pid first. A group kill can succeed by hitting only sleep.
+      kill -9 "$k" 2>/dev/null || true
+      kill -9 -"$k" 2>/dev/null || true
+      if [ "$timed_out" -eq 1 ]; then
+        printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&2
+        [ "$ec" -eq 0 ] && ec=124
+      fi
+      rm -f "$flag"
       wait "$k" 2>/dev/null || true
       exit "$ec"
-    ' _ "$@"
+    ' _ "$flag" "$@"
   else
     "$@"
   fi
