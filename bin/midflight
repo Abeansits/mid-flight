@@ -794,14 +794,7 @@ run_engine() {
       pg=$!
       exec 3>&2
       (
-        # A group kill aborts this sleep and resumes the shell at the next
-        # command, so "sleep || exit" never runs. SECONDS in this subshell is
-        # not seconds-since-sleep on macOS bash 3.2, so the gate uses the wall
-        # clock. A killed sleep does not consume the interval.
-        start=$(date +%s)
         sleep '"$to"'
-        now=$(date +%s)
-        [ $((now - start)) -ge '"$to"' ] || exit 0
         printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&3
         kill -TERM -"$pg" 2>/dev/null || true
         sleep 1
@@ -815,9 +808,11 @@ run_engine() {
       # exits before the deadline (or is killed by it) would look like success.
       ec=0
       wait "$pg" 2>/dev/null || ec=$?
-      # Kill the watchdog group, not only the subshell. Otherwise its sleep
-      # keeps running and this shell waits out the rest of the deadline.
-      kill -TERM -"$k" 2>/dev/null || true
+      # macOS bash 3.2 does not exit when SIGTERM arrives while this shell is
+      # waiting. sleep then runs out the deadline, so the date +%s gate from
+      # #54 still prints a timeout after a fast provider. SIGKILL stops the
+      # shell before that printf.
+      kill -9 -"$k" 2>/dev/null || kill -9 "$k" 2>/dev/null || true
       wait "$k" 2>/dev/null || true
       exit "$ec"
     ' _ "$@"
