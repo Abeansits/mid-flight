@@ -70,6 +70,7 @@ classify_provider_failure() {
   local excerpt=""
   local log_text=""
   local normalized=""
+  local socket_path=""
 
   provider_label="$(provider_display_name "$provider_name")"
   excerpt="$(provider_error_excerpt "$log_file")"
@@ -88,6 +89,38 @@ classify_provider_failure() {
     *"rate limit"*|*rate_limit*|*"too many requests"*|*"quota exceeded"*|*"resource exhausted"*|*"status 429"*|*"error 429"*)
       PROVIDER_FAILURE_DETAIL="${provider_name} rate limited"
       PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} hit a rate limit or quota. Wait a bit, then try again.${excerpt}"
+      ;;
+    *"runtime-socket deny path"*"endpoint is a symlink"*|*"socket deny resolution failed"*"endpoint is a symlink"*|*"sandbox could not be applied"*"endpoint is a symlink"*)
+      # Grok refuses --sandbox read-only when a runtime socket (Docker Desktop's
+      # /var/run/docker.sock) is still a symlink. That warning contains
+      # "could not resolve", which is not a DNS failure.
+      case "$log_text" in
+        *"runtime-socket deny path "*)
+          socket_path="${log_text#*"runtime-socket deny path "}"
+          socket_path="${socket_path%%:*}"
+          ;;
+        *)
+          case "$normalized" in
+            *"runtime-socket deny path "*)
+              socket_path="${normalized#*"runtime-socket deny path "}"
+              socket_path="${socket_path%%:*}"
+              ;;
+          esac
+          ;;
+      esac
+      case "$socket_path" in
+        /*) ;;
+        *) socket_path="" ;;
+      esac
+      case "$socket_path" in
+        *[[:space:]]*) socket_path="" ;;
+      esac
+      PROVIDER_FAILURE_DETAIL="${provider_name} sandbox refusal"
+      if [ -n "$socket_path" ]; then
+        PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} refused to start the read-only sandbox because a runtime socket path is a symlink (\"${socket_path}\").${excerpt}"
+      else
+        PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} refused to start the read-only sandbox because a runtime socket path is a symlink.${excerpt}"
+      fi
       ;;
     *"timed out"*|*timeout*|*"network error"*|*"connection reset"*|*"connection refused"*|*"could not resolve"*|*"temporary failure in name resolution"*|*enotfound*|*econnreset*|*dns*)
       PROVIDER_FAILURE_DETAIL="${provider_name} network error"
