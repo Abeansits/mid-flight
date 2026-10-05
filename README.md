@@ -334,7 +334,7 @@ From Claude Code, prefer a non-`claude` provider — `provider=claude` is circul
 
 Video analysis uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
 
-Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config uses Grok when that CLI is on `PATH`. `-p` must be `grok`. The prompt asks for 720p when `image_to_video` lists `resolution_name`. The saved file can be smaller. The first `--ref` is the opening frame and sets the shape. A different `--aspect` is an error.
+Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config is overridden to Grok. `-p` must be `grok`. The prompt asks for 720p when `image_to_video` lists `resolution_name`. The saved file can be smaller. The first `--ref` is the opening frame and sets the shape. A readable PNG or JPEG that conflicts with `--aspect` exits 2. An unreadable frame warns on stderr and continues.
 
 ### Consult and file writes
 
@@ -355,7 +355,7 @@ These consult paths do not get a read-only flag. Writes follow that CLI's own pe
 
 Video analysis runs on Antigravity or Gemini, so it has no read-only flag either.
 
-Image generation uses your configured provider when it is `grok` or `codex`. Otherwise it picks **grok if it's on `PATH`**, else Codex. `-p grok` and `-p codex` choose directly.
+Image generation uses your configured provider when it is `grok` or `codex`. Otherwise it picks **grok if it's on `PATH`**, else Codex if that CLI is on `PATH`, else Grok. `-p grok` and `-p codex` choose directly.
 
 ### Gemini CLI status
 
@@ -474,13 +474,14 @@ Restart Claude Code after either.
 bash tests/run_all.sh
 ```
 
-Follow-up work (agy provider, host adapters, CLI context): [ROADMAP.md](ROADMAP.md).
+Shipped history and the current install note: [ROADMAP.md](ROADMAP.md).
 
 ### Releasing
 
 1. On a working branch: `scripts/release.sh prepare X.Y.Z` — bumps `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, commits.
-2. Merge the PR, switch to a clean local `main` that matches `origin/main`, then `scripts/release.sh publish X.Y.Z`.
-3. Update `Formula/midflight.rb` in a follow-up. Set `url` to `https://github.com/Abeansits/mid-flight/archive/refs/tags/vX.Y.Z.tar.gz` and set `sha256` to that file. Homebrew serves the new tag only after that change is on `main`.
+2. Merge the PR, switch to a clean local `main` that matches `origin/main`, then `scripts/release.sh publish X.Y.Z`. That publishes the git tag. It does not change Homebrew.
+3. Update `Formula/midflight.rb` in a follow-up. Set `url` to `https://github.com/Abeansits/mid-flight/archive/refs/tags/vX.Y.Z.tar.gz` and set `sha256` to that file. Land that change on `main`.
+4. Only then is the new tag a stable Homebrew install. `brew update`, then `brew upgrade Abeansits/mid-flight/midflight`.
 
 ```bash
 curl -fsSL -o /tmp/midflight.tar.gz \
@@ -490,12 +491,36 @@ sha256sum /tmp/midflight.tar.gz
 
 On macOS, `shasum -a 256 /tmp/midflight.tar.gz` prints the same digest.
 
-`publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch. Users then run `brew update` and `brew upgrade Abeansits/mid-flight/midflight`.
+`publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch.
+
+`Formula/midflight.rb` currently installs `v1.18.0`. `brew upgrade` stays on that tag until the formula change for a newer tag is on `main`.
+
+#### Release smoke check
+
+Copy this after a release. The consult and the host skill need credentials on the maintainer's machine. They are not CI, and provider credentials do not go in GitHub Actions. A short note in the release PR or the release notes is enough evidence. Record the provider and the version you used.
+
+```text
+[ ] bash tests/run_all.sh
+[ ] shell-tests CI green on ubuntu-latest and macos-latest
+[ ] Maintainer, not CI: one real consult
+    midflight -p <provider> "Reply with the single word pong."
+    Answer is nonempty. Provider: ______. midflight --version: ______.
+[ ] Maintainer, not CI: one installed host skill reaches the engine
+    Host this release (rotate when that adapter changed): Claude / Codex / Grok / Cursor
+    Invocation: /midflight or $midflight, with a small question. Reply came back.
+[ ] After the formula change is on main:
+    brew update
+    brew upgrade Abeansits/mid-flight/midflight
+    midflight --version
+    midflight --help
+```
+
+A fresh machine can use `brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight` and `brew install Abeansits/mid-flight/midflight` instead of `brew upgrade`. Do that only after the formula PR is on `main`. Until then, stable Homebrew is still the tag already in `Formula/midflight.rb`.
 
 <details>
 <summary><strong>Architecture</strong></summary>
 
-MidFlight is a thin router over other agents' CLIs.
+MidFlight routes one question to another agent's CLI.
 
 - **Host** — Claude Code (`/midflight`), Codex (`$midflight` skills under `hosts/codex/skills/`), Grok Build (`/midflight` skills under `hosts/grok/skills/`), Cursor and Cursor Grok Bot (`/midflight` skills under `hosts/cursor/skills/`), or the standalone `bin/midflight` CLI. The host is responsible for summarizing context.
 - **Engine** — `scripts/query.sh` plus `scripts/lib/`. Assembles the prompt, picks the provider, captures the response.

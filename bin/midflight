@@ -54,6 +54,34 @@ Usage:
   midflight --video-gen PROMPT
   midflight -f QUERY_FILE [OPTIONS]
 
+Calling contract:
+  Exit 0: provider reply on stdout. [mid-flight] logs on stderr.
+  Exit 2: usage error. midflight: … on stderr, empty stdout.
+  Exit 1: engine or provider error. Error: … on stdout, [mid-flight] logs
+          on stderr. Dual exits 1 if either side fails; the other answer
+          is still printed.
+  Consult stdout is the reply. Dual stdout is ## Provider A: <name>,
+          ## Provider B: <name>, then ## Where they differ. MidFlight does
+          not merge the answers.
+  --image-gen and --video-gen stdout is one absolute path. Exit 1 when no
+          new file was saved; that note is on stderr.
+  Default provider is codex when config has no provider=.
+  -p on --image-gen must be codex or grok. -p on --video-gen must be grok.
+          Aliases: antigravity → agy, grok-build → grok.
+  --video keeps agy or gemini (config or -p). Any other provider prefers
+          agy on PATH, else Gemini. --image-gen keeps grok or codex; any
+          other uses grok on PATH, else Codex on PATH, else grok.
+          --video-gen keeps grok; any other provider is overridden to grok.
+  Unknown --dual or --providers names exit 2. Unknown -p on one consult
+          is exit 1 (Error: invalid config).
+  Exit 2 when --query-file is combined with a question, --context, -i,
+          --git-status, or --diff. Those flags do not apply to --video,
+          --image-gen, or --video-gen.
+  Stdin is ignored. -- ends options (a question that starts with - needs it).
+  Implement can write the workspace. Codex, Grok, and Claude consults are
+          read-only. Antigravity, Gemini, OpenCode, and Oz follow that CLI's
+          permission settings. Sandbox details: docs/standalone-usage.md.
+
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
   -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
@@ -66,7 +94,7 @@ Options:
   -i, --include GLOB     read matching files into the Context section (repeatable)
       --git-status        append current branch + git status under Context
       --diff              append git diff (working tree) and staged diff under Context
-      --video FILE|URL    analyze a video (forces video mode + agy or Gemini)
+      --video FILE|URL    analyze a video (keeps agy or gemini; else agy on PATH, else Gemini)
       --image-gen PROMPT  generate one image with Grok or Codex; prints the file path
       --video-gen PROMPT  generate one video with Grok; prints the file path.
                           Asks for 720p when image_to_video lists resolution_name.
@@ -74,19 +102,18 @@ Options:
       --ref FILE          reference image for --image-gen or --video-gen (repeatable).
                           On a video, the first file is the opening frame and sets the shape.
       --aspect RATIO      1:1, 16:9, 9:16, 3:2, or 2:3.
-                          On a video, a first --ref with a different shape is an error.
-      --timeout SECONDS   hard bound on each provider call (default: off/0; when N>0 the
-                          wrapper owns a portable bash watchdog + process-group kill
-                          so provider children die too; no coreutils needed; dual ≈ 2N wall)
+                          On a video, a readable PNG or JPEG that conflicts
+                          with --aspect exits 2. An unreadable frame warns
+                          on stderr and continues.
+      --timeout SECONDS   hard bound on each provider call (default off; dual ≈ 2N wall)
   -h, --help             show this help
   -V, --version          show version
 
-Dual-consult (--dual / --providers): same question to two providers, print both
-answers and a light structural note. Consult-only in v1 (refuse implement/video).
-Primary UX: midflight --dual agy "…" (primary from config or -p). Explicit form:
-midflight --providers codex,agy "…". Sequential; if one fails, the other is still
-shown. MidFlight does not synthesize a merged opinion. --timeout applies per side
-(~2N wall-clock for dual).
+Dual-consult (--dual / --providers) is consult-only. Same question, both
+answers, no merged opinion. Primary: midflight --dual agy "…" (primary from
+config or -p). Explicit: midflight --providers codex,agy "…". Sequential;
+if one fails, the other is still shown. --timeout applies per side
+(~2N wall-clock).
 
 Git context (--git-status / --diff) is capped at 100 KiB (102400 bytes) per
 section. Raise via MIDFLIGHT_GIT_CONTEXT_MAX_BYTES. Requires a git repo and git
@@ -109,8 +136,8 @@ Examples:
   midflight --video-gen "the paper plane banks once and levels out"
   midflight --image-gen "a paper plane over a fjord" --aspect 16:9 --ref plane.png
 
-The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH;
-see the project README for configuration details.
+The engine reads ~/.config/mid-flight/config and the provider CLIs from PATH.
+Configuration: project README. Sandbox details: docs/standalone-usage.md.
 EOF
 }
 
