@@ -70,26 +70,26 @@ classify_provider_failure() {
   local excerpt=""
   local log_text=""
   local normalized=""
+  local tail_text=""
+  local tail_normalized=""
   local socket_path=""
+  local sandbox_matched=""
 
   provider_label="$(provider_display_name "$provider_name")"
   excerpt="$(provider_error_excerpt "$log_file")"
 
   if [ -f "$log_file" ]; then
     log_text="$(cat "$log_file")"
+    tail_text="$(tail -n 3 "$log_file")"
   fi
 
   normalized="$(printf '%s' "$log_text" | tr '[:upper:]' '[:lower:]')"
+  tail_normalized="$(printf '%s' "$tail_text" | tr '[:upper:]' '[:lower:]')"
 
+  # Socket-symlink warnings are matched on the whole log, before auth, so an
+  # earlier "permission denied" cannot hide them. Auth, rate limit, and
+  # network use the same last-three-line window as Details.
   case "$normalized" in
-    *unauthorized*|*"authentication failed"*|*"invalid api key"*|*"not logged in"*|*"login required"*|*forbidden*|*"permission denied"*|*invalid_auth*)
-      PROVIDER_FAILURE_DETAIL="${provider_name} authentication failed"
-      PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} authentication failed. Re-authenticate the ${provider_label} CLI and try again.${excerpt}"
-      ;;
-    *"rate limit"*|*rate_limit*|*"too many requests"*|*"quota exceeded"*|*"resource exhausted"*|*"status 429"*|*"error 429"*)
-      PROVIDER_FAILURE_DETAIL="${provider_name} rate limited"
-      PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} hit a rate limit or quota. Wait a bit, then try again.${excerpt}"
-      ;;
     *"runtime-socket deny path"*"endpoint is a symlink"*|*"socket deny resolution failed"*"endpoint is a symlink"*|*"sandbox could not be applied"*"endpoint is a symlink"*)
       # Grok refuses --sandbox read-only when a runtime socket (Docker Desktop's
       # /var/run/docker.sock) is still a symlink. That warning contains
@@ -121,10 +121,29 @@ classify_provider_failure() {
       else
         PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} refused to start the read-only sandbox because a runtime socket path is a symlink.${excerpt}"
       fi
+      sandbox_matched="yes"
       ;;
-    *"timed out"*|*timeout*|*"network error"*|*"connection reset"*|*"connection refused"*|*"could not resolve"*|*"temporary failure in name resolution"*|*enotfound*|*econnreset*|*dns*)
+  esac
+
+  if [ -n "$sandbox_matched" ]; then
+    return 0
+  fi
+
+  case "$tail_normalized" in
+    *unauthorized*|*"authentication failed"*|*"invalid api key"*|*"not logged in"*|*"login required"*|*invalid_auth*)
+      PROVIDER_FAILURE_DETAIL="${provider_name} authentication failed"
+      PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} authentication failed. Re-authenticate the ${provider_label} CLI and try again.${excerpt}"
+      ;;
+    *"rate limit"*|*rate_limit*|*"too many requests"*|*"quota exceeded"*|*"resource exhausted"*|*"status 429"*|*"error 429"*)
+      PROVIDER_FAILURE_DETAIL="${provider_name} rate limited"
+      PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} hit a rate limit or quota. Wait a bit, then try again.${excerpt}"
+      ;;
+    *"timed out"*|*timeout*|*"network error"*|*"connection reset"*|*"connection refused"*|*"could not resolve"*|*"temporary failure in name resolution"*|*enotfound*|*econnreset*)
       PROVIDER_FAILURE_DETAIL="${provider_name} network error"
       PROVIDER_FAILURE_MESSAGE="Error: ${provider_label} failed because of a network issue. Check connectivity and try again.${excerpt}"
+      ;;
+    *)
+      PROVIDER_FAILURE_MESSAGE="${PROVIDER_FAILURE_MESSAGE}${excerpt}"
       ;;
   esac
 }
@@ -139,7 +158,7 @@ query_codex() {
   prepare_provider_run \
     "codex" \
     "codex.log" \
-    "Error: Codex query failed. Make sure the Codex CLI is installed and authenticated."
+    "Error: Codex query failed."
 
   # `--sandbox` only gates model-generated shell/tool writes (codex-cli help),
   # not host session/rollout files under $CODEX_HOME. Consult/video stay
@@ -181,7 +200,7 @@ query_gemini() {
   prepare_provider_run \
     "gemini" \
     "gemini.log" \
-    "Error: Gemini query failed. Make sure the Gemini CLI is installed and authenticated."
+    "Error: Gemini query failed."
 
   gemini \
     -p "$full_prompt" \
@@ -201,7 +220,7 @@ query_agy() {
   prepare_provider_run \
     "agy" \
     "agy.log" \
-    "Error: Antigravity query failed. Make sure the Antigravity CLI (agy) is installed and authenticated."
+    "Error: Antigravity query failed."
 
   if [ -n "$agy_model" ]; then
     args+=(--model "$agy_model")
@@ -234,7 +253,7 @@ query_opencode() {
   prepare_provider_run \
     "opencode" \
     "opencode.log" \
-    "Error: OpenCode query failed. Make sure the opencode CLI is installed and authenticated."
+    "Error: OpenCode query failed."
 
   version="$(opencode --version 2>/dev/null)" || version=""
   if [[ "$version" =~ ^(opencode[[:space:]]+)?v?([0-9]+)\. ]] && [ "${BASH_REMATCH[2]}" -ge 2 ]; then
@@ -278,7 +297,7 @@ query_oz() {
   prepare_provider_run \
     "oz" \
     "oz.log" \
-    "Error: Oz query failed. Make sure the oz CLI is installed and authenticated."
+    "Error: Oz query failed."
 
   if [ -n "$oz_model" ]; then
     args+=(--model "$oz_model")
@@ -303,7 +322,7 @@ query_grok() {
   prepare_provider_run \
     "grok" \
     "grok.log" \
-    "Error: Grok query failed. Make sure the Grok CLI is installed and authenticated."
+    "Error: Grok query failed."
 
   if [ -n "$grok_model" ]; then
     args+=(-m "$grok_model")
@@ -347,7 +366,7 @@ query_claude() {
   prepare_provider_run \
     "claude" \
     "claude.log" \
-    "Error: Claude query failed. Make sure the Claude Code CLI is installed and authenticated."
+    "Error: Claude query failed."
 
   if [ -n "$claude_model" ]; then
     args+=(--model "$claude_model")
