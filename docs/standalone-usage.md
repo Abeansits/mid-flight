@@ -118,7 +118,7 @@ Rules:
 - Sequential engine runs (same assembled query file / `--query-file`).
 - Stdout is a labeled dump (`## Provider A` / `## Provider B`) plus a short `## Where they differ` note that is structural only (identical-after-trim, or “compare them yourself”). MidFlight does **not** invent a merged opinion or LLM disagreement analysis.
 - If one provider fails, the successful answer is still printed and the failed side shows its error; exit status is `1`.
-- `--timeout` applies per side (~2N wall-clock for dual).
+- `--timeout` applies per side (~2N wall-clock for dual). A side that hits the bound shows `Error: timed out after Ns waiting for provider response` in its section.
 - `--model` is not combined with dual (set per-provider models in config). `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
 
 ### Git-derived context
@@ -262,3 +262,10 @@ Your `~/.config/mid-flight/config` is never modified.
   and dual-consult when either side fails (the other answer is still printed).
   If image or video generation runs and saves no new file, exit 1 and the
   note is on stderr.
+- `--timeout` — when the bound fires, stdout is
+  `Error: timed out after Ns waiting for provider response` and stderr is
+  `midflight: timed out after Ns waiting for provider response` (once).
+  The exit status is whatever `wait` returned, except 0 becomes 124. A
+  signal kill stays 143 or 137 and is not remapped to 1. A provider that
+  exits before the deadline does not print that sentence. In a dual
+  consult, the timed-out side's section is the stdout line.

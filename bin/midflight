@@ -819,7 +819,9 @@ run_engine() {
       kill -9 "$k" 2>/dev/null || true
       kill -9 -"$k" 2>/dev/null || true
       if [ "$timed_out" -eq 1 ]; then
+        # Same flag as the stderr line. Stdout is what a harness keeps.
         printf "midflight: timed out after %ss waiting for provider response\n" '"$to"' >&2
+        printf "Error: timed out after %ss waiting for provider response\n" '"$to"'
         [ "$ec" -eq 0 ] && ec=124
       fi
       rm -f "$flag"
