@@ -62,7 +62,8 @@ assert_not_contains() {
   fi
 }
 
-write_grok_failure_stub "warning: sandbox could not be applied: socket deny resolution failed: could not resolve runtime-socket deny path /var/run/docker.sock: endpoint is a symlink
+write_grok_failure_stub "permission denied
+warning: sandbox could not be applied: socket deny resolution failed: could not resolve runtime-socket deny path /var/run/docker.sock: endpoint is a symlink
 error: could not apply the 'read-only' sandbox profile; see the warning above for the cause. Refusing to start with its protections missing."
 
 set +e
@@ -88,6 +89,8 @@ assert_not_contains "$output" "failed because of a network issue" \
   "symlink socket refusal must not use the network-error text"
 assert_not_contains "$output" "network error" \
   "symlink socket refusal must not be classified as a network error"
+assert_not_contains "$output" "authentication failed" \
+  "an earlier permission denied line must not label a socket symlink as auth"
 
 write_grok_failure_stub "curl: (6) Could not resolve host: api.x.ai"
 
