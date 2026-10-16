@@ -14,8 +14,9 @@ EOF
 
 # Slow stub: sleeps longer than the timeout we will pass. The wrapper's
 # --timeout watchdog (pure bash, pg kill) must fire first, kill the group,
-# print clear message on stderr, and exit nonzero. No "Terminated" noise
-# should appear in the captured output (watchdog redirects + reaps).
+# print the timeout sentence on stdout (the result a harness keeps) and
+# once on stderr, and exit nonzero. No "Terminated" noise should come from
+# the watchdog itself (redirected + reaped).
 write_slow_codex_stub() {
   cat > "$TEST_DIR/bin/codex" <<'STUB'
 #!/bin/bash
@@ -58,17 +59,22 @@ assert_pid_gone() {
 
 write_slow_codex_stub
 
+stdout_file="$TEST_DIR/timeout.stdout"
+stderr_file="$TEST_DIR/timeout.stderr"
 start=$(date +%s)
 set +e
-output="$(run_cli --timeout 2 "slow provider test under --timeout guard?" 2>&1)"
+run_cli --timeout 2 "slow provider test under --timeout guard?" >"$stdout_file" 2>"$stderr_file"
 status=$?
 set -e
 end=$(date +%s)
 elapsed=$(( end - start ))
+stdout="$(cat "$stdout_file")"
+stderr="$(cat "$stderr_file")"
 
 if [ "$status" -eq 0 ]; then
   echo "FAIL: --timeout 2 with a 10s stub must exit nonzero" >&2
-  echo "Captured (first 300): ${output:0:300}" >&2
+  echo "stdout (first 300): ${stdout:0:300}" >&2
+  echo "stderr (first 300): ${stderr:0:300}" >&2
   echo "Elapsed: ${elapsed}s" >&2
   exit 1
 fi
@@ -78,16 +84,24 @@ if [ "$elapsed" -lt 1 ] || [ "$elapsed" -gt 5 ]; then
   exit 1
 fi
 
-timeout_msgs="$(printf '%s\n' "$output" | grep -c 'timed out after 2s' || true)"
-assert_eq "1" "$timeout_msgs" "timeout message should be reported once"
+# Stdout is captured alone. A harness that drops stderr still sees the sentence.
+assert_eq "Error: timed out after 2s waiting for provider response" "$stdout" \
+  "stdout should be the timeout sentence"
+stderr_msgs="$(printf '%s\n' "$stderr" | grep -c 'midflight: timed out after 2s waiting for provider response' || true)"
+assert_eq "1" "$stderr_msgs" "stderr timeout line should be printed once"
+if printf '%s\n' "$stdout" | grep -q 'midflight: timed out after 2s'; then
+  echo "FAIL: the stderr timeout line leaked onto stdout" >&2
+  exit 1
+fi
 
 assert_pid_gone "$TEST_DIR/provider.pid" "provider"
 assert_pid_gone "$TEST_DIR/provider_child.pid" "provider child"
 
 # The engine may print its own internal job Terminated when we nuke the provider
-# call (expected); our watchdog (redirected + reaped) must not add extra noise.
-# Main proof: the timeout msg appeared and we did not get the SLOW-RESPONSE.
-if echo "$output" | grep -qi 'SLOW-RESPONSE'; then
+# call (expected, on stderr); our watchdog (redirected + reaped) must not add
+# extra noise. Main proof: the timeout sentence is on stdout and we did not
+# get the SLOW-RESPONSE.
+if printf '%s\n' "$stdout" "$stderr" | grep -qi 'SLOW-RESPONSE'; then
   echo "FAIL: slow stub response should not have been produced (kill did not happen in time)" >&2
   exit 1
 fi
