@@ -154,6 +154,7 @@ query_codex() {
   local sandbox_mode="read-only"
   local ref_path=""
   local image_args=()
+  local resolved_codex_home=""
 
   prepare_provider_run \
     "codex" \
@@ -174,17 +175,41 @@ query_codex() {
     done < "$MIDFLIGHT_REFS_FILE"
   fi
 
+  # A temp HOME (build_config_home, or a host override) symlinks ~/.codex at
+  # the real directory. Codex treats paths under that home as writable roots
+  # and refuses them when a path component is a symlink, so shell, patch, and
+  # memory writes fail. Pass the canonical directory as CODEX_HOME for this
+  # process only. An already-set CODEX_HOME is left alone, including when it
+  # is empty or itself a symlink. CDPATH would make cd print the destination
+  # and pollute the captured path.
+  if [ -z "${CODEX_HOME+x}" ] && [ -n "${HOME:-}" ] && [ -L "$HOME/.codex" ] && [ -d "$HOME/.codex" ]; then
+    resolved_codex_home="$(CDPATH='' cd "$HOME/.codex" 2>/dev/null && pwd -P)" || resolved_codex_home=""
+  fi
+
   # ${image_args[@]+...} keeps bash 3.2 set -u happy when there are no refs.
-  codex exec \
-    --model "$codex_model" \
-    -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
-    --sandbox "$sandbox_mode" \
-    --skip-git-repo-check \
-    ${image_args[@]+"${image_args[@]}"} \
-    -o "$output_file" \
-    "$full_prompt" \
-    > "$PROVIDER_LOG_FILE" \
-    2>&1
+  if [ -n "$resolved_codex_home" ] && [ ! -L "$resolved_codex_home" ] && [ -d "$resolved_codex_home" ]; then
+    CODEX_HOME="$resolved_codex_home" codex exec \
+      --model "$codex_model" \
+      -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
+      --sandbox "$sandbox_mode" \
+      --skip-git-repo-check \
+      ${image_args[@]+"${image_args[@]}"} \
+      -o "$output_file" \
+      "$full_prompt" \
+      > "$PROVIDER_LOG_FILE" \
+      2>&1
+  else
+    codex exec \
+      --model "$codex_model" \
+      -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
+      --sandbox "$sandbox_mode" \
+      --skip-git-repo-check \
+      ${image_args[@]+"${image_args[@]}"} \
+      -o "$output_file" \
+      "$full_prompt" \
+      > "$PROVIDER_LOG_FILE" \
+      2>&1
+  fi
 }
 
 query_gemini() {
