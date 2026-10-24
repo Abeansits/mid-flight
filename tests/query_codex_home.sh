@@ -42,6 +42,8 @@ output="$(run_query "$QUERY_FILE" consult)"
 assert_eq "codex-home-ok" "$output" "consult should still return stubbed codex output"
 assert_eq "" "$(cat "$TEST_DIR/codex_home.txt")" \
   "a real ~/.codex should leave CODEX_HOME unset"
+assert_eq "unset" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "a real ~/.codex should leave CODEX_HOME unset"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
   "consult must still pass --sandbox read-only"
 
@@ -56,6 +58,8 @@ assert_real_dir "$canonical" "symlink target should be a real directory"
 output="$(run_query "$QUERY_FILE" consult)"
 assert_eq "$canonical" "$(cat "$TEST_DIR/codex_home.txt")" \
   "unset CODEX_HOME should be the canonical symlink target"
+assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "a symlinked ~/.codex should set CODEX_HOME"
 assert_real_dir "$(cat "$TEST_DIR/codex_home.txt")" \
   "CODEX_HOME should be a real directory, not a symlink"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
@@ -66,6 +70,8 @@ for mode in implement image-gen; do
   assert_eq "codex-home-ok" "$output" "$mode should still return stubbed codex output"
   assert_eq "$canonical" "$(cat "$TEST_DIR/codex_home.txt")" \
     "$mode should also point CODEX_HOME at the real directory"
+  assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+    "$mode should set CODEX_HOME"
   assert_eq "workspace-write" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
     "$mode must still pass --sandbox workspace-write"
 done
@@ -79,6 +85,8 @@ export CODEX_HOME="$preset_link"
 output="$(run_query "$QUERY_FILE" consult)"
 assert_eq "$preset_link" "$(cat "$TEST_DIR/codex_home.txt")" \
   "a pre-set CODEX_HOME must be forwarded unchanged"
+assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "a pre-set CODEX_HOME must stay set"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
   "consult must still pass --sandbox read-only when CODEX_HOME is pre-set"
 unset CODEX_HOME
@@ -88,6 +96,8 @@ export CODEX_HOME=""
 output="$(run_query "$QUERY_FILE" consult)"
 assert_eq "" "$(cat "$TEST_DIR/codex_home.txt")" \
   "an empty CODEX_HOME must be left empty"
+assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "an empty CODEX_HOME must remain set"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
   "consult must still pass --sandbox read-only when CODEX_HOME is empty"
 unset CODEX_HOME
@@ -98,6 +108,8 @@ ln -s "$TEST_DIR/missing codex" "$HOME/.codex"
 output="$(run_query "$QUERY_FILE" consult)"
 assert_eq "codex-home-ok" "$output" "a dangling ~/.codex symlink should still return output"
 assert_eq "" "$(cat "$TEST_DIR/codex_home.txt")" \
+  "a dangling ~/.codex symlink should leave CODEX_HOME unset"
+assert_eq "unset" "$(cat "$TEST_DIR/codex_home_state.txt")" \
   "a dangling ~/.codex symlink should leave CODEX_HOME unset"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
   "consult must still pass --sandbox read-only when ~/.codex is dangling"
@@ -110,6 +122,8 @@ output="$(run_cli -p codex "Which home does the temp overlay use?")"
 assert_eq "codex-home-ok" "$output" "-p codex should still return stubbed codex output"
 assert_eq "$canonical" "$(cat "$TEST_DIR/codex_home.txt")" \
   "a temp HOME from -p should export the real ~/.codex"
+assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "a temp HOME from -p should set CODEX_HOME"
 assert_real_dir "$(cat "$TEST_DIR/codex_home.txt")" \
   "the -p CODEX_HOME should be a real directory"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
