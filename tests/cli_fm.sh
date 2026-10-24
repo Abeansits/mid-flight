@@ -75,8 +75,9 @@ status=$?
 set -e
 assert_eq "1" "$status" "over-limit fm prompt should exit 1"
 assert_contains "$output" "the prompt is 3073 tokens" "over-limit error should report the count"
-assert_contains "$output" "fm's limit is 4096" "over-limit error should name the 4096 window"
-assert_contains "$output" "shorten the question or use another provider" \
+assert_contains "$output" "3072" "over-limit error should state the 3072 threshold"
+assert_contains "$output" "4096-token window" "over-limit error should mention the 4096 window"
+assert_contains "$output" "Shorten the question or use another provider" \
   "over-limit error should say how to recover"
 if [ -f "$TEST_DIR/fm_prompt.txt" ]; then
   echo "FAIL: over-limit fm must not call respond" >&2
@@ -209,7 +210,7 @@ assert_eq "1" "$status" "unlicensed fm should exit 1"
 assert_contains "$output" "sudo fm license" "unlicensed fm should mention sudo fm license"
 assert_contains "$output" "fm available" "unlicensed fm should mention fm available"
 
-write_fm_failure "The requested model is unavailable"
+write_fm_failure "fm: model unavailable"
 set +e
 output="$(run_cli -p fm "availability check" 2>/dev/null)"
 status=$?
@@ -217,6 +218,30 @@ set -e
 assert_eq "1" "$status" "unavailable fm model should exit 1"
 assert_contains "$output" "requires macOS 27" "unavailable model should mention macOS 27"
 assert_contains "$output" "fm available" "unavailable model should mention fm available"
+
+write_fm_failure "service unavailable"
+set +e
+output="$(run_cli -p fm "generic unavailable" 2>/dev/null)"
+status=$?
+set -e
+assert_eq "1" "$status" "generic unavailable should exit 1"
+assert_contains "$output" "Error: fm query failed." "generic unavailable should stay a query failure"
+if [[ "$output" == *"sudo fm license"* ]]; then
+  echo "FAIL: generic unavailable must not be rewritten as a license error" >&2
+  exit 1
+fi
+
+write_fm_failure "notes.md: no such file or directory"
+set +e
+output="$(run_cli -p fm "missing notes" 2>/dev/null)"
+status=$?
+set -e
+assert_eq "1" "$status" "a generic missing-file error should exit 1"
+assert_contains "$output" "Error: fm query failed." "a generic missing file should stay a query failure"
+if [[ "$output" == *"sudo fm license"* ]]; then
+  echo "FAIL: a generic missing file must not be rewritten as a license error" >&2
+  exit 1
+fi
 
 write_fm_failure "prompt exceeds context size"
 set +e

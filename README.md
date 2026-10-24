@@ -452,7 +452,7 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 | `Grok query failed` | Auth or provider error | `grok --version`; run `grok login` |
 | `Claude query failed` | Auth or provider error | `claude --version`; confirm Claude Code login |
 | `fm requires macOS 27` | `fm` is missing, unlicensed, or the model is unavailable | macOS 27, then `sudo fm license`, then `fm available` |
-| `the prompt is N tokens, fm's limit is 4096` | On-device prompt is over 3072 tokens | Shorten the question or use another provider. `pcc` is not preflighted |
+| `above the 3072 limit` | On-device prompt is over 3072 tokens (4096 window) | Shorten the question or use another provider. `pcc` is not preflighted |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin and is waiting for EOF | Upgrade MidFlight; stdin is now detached |
 | `Video file exceeds 20MB limit` | Gemini inline-file limit | Compress or trim the video |

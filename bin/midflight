@@ -411,34 +411,6 @@ if [ "$MODE" = "video-gen" ] && [ -n "$PROVIDER" ]; then
   esac
 fi
 
-# fm has no repo or tool access. --video / --image-gen / --video-gen keep the
-# usual retarget for a provider that cannot do that job. implement would call fm.
-effective_provider_name() {
-  local name="" cfg=""
-  if [ -n "$PROVIDER" ]; then
-    normalize_provider_name "$PROVIDER"
-    return
-  fi
-  if [ -n "$CONFIG_FILE" ]; then
-    cfg="$CONFIG_FILE"
-  elif [ -n "${HOME:-}" ] && [ -f "$HOME/.config/mid-flight/config" ]; then
-    cfg="$HOME/.config/mid-flight/config"
-  fi
-  if [ -n "$cfg" ] && [ -f "$cfg" ]; then
-    name="$(grep '^provider=' "$cfg" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
-  fi
-  if [ -z "$name" ]; then
-    name="codex"
-  fi
-  normalize_provider_name "$name"
-}
-
-if [ "$MODE" = "implement" ]; then
-  case "$(effective_provider_name)" in
-    fm) die "fm is consult-only (no repo access); use -m consult" ;;
-  esac
-fi
-
 provider_label() {
   case "$1" in
     codex) printf '%s\n' "Codex" ;;

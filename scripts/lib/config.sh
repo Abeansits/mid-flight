@@ -311,8 +311,7 @@ ensure_provider_available() {
     grok) install_url="https://docs.x.ai/build/cli/reference" ;;
     claude) install_url="https://code.claude.com/docs/en/headless" ;;
     fm)
-      # Ships with macOS 27. A missing binary is classified from the failed
-      # exec so the message can name `sudo fm license` and `fm available`.
+      # Missing fm is classified from the failed exec (macOS 27 / license).
       return 0
       ;;
   esac
