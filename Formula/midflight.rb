@@ -1,8 +1,8 @@
 class Midflight < Formula
   desc "On-demand consult with Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude"
   homepage "https://github.com/Abeansits/mid-flight"
-  url "https://github.com/Abeansits/mid-flight/archive/refs/tags/v1.19.1.tar.gz"
-  sha256 "5038bc5bd12b1e12ab857dda0cfb6a5b008ae4db3b441bdddcae0a5a76d7e015"
+  url "https://github.com/Abeansits/mid-flight/archive/refs/tags/v1.19.2.tar.gz"
+  sha256 "0797ab7cece987943fff5c14efc68dc41c8fbe75f49bc82cfcd4278666cbb5a5"
   license "MIT"
   head "https://github.com/Abeansits/mid-flight.git", branch: "main"
 
