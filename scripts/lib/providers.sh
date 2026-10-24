@@ -148,12 +148,31 @@ classify_provider_failure() {
   esac
 }
 
+# Print the canonical directory when link_path is a symlink to a real
+# directory. Print nothing otherwise. CDPATH is cleared so cd does not
+# print the destination into the captured path.
+resolve_real_home() {
+  local link_path="$1"
+  local resolved=""
+
+  if [ -z "$link_path" ] || [ ! -L "$link_path" ] || [ ! -d "$link_path" ]; then
+    return 0
+  fi
+
+  resolved="$(CDPATH='' cd "$link_path" 2>/dev/null && pwd -P)" || return 0
+  if [ -n "$resolved" ] && [ ! -L "$resolved" ] && [ -d "$resolved" ]; then
+    printf '%s\n' "$resolved"
+  fi
+}
+
 query_codex() {
   local full_prompt="$1"
   local output_file="$2"
   local sandbox_mode="read-only"
   local ref_path=""
   local image_args=()
+  local codex_env=()
+  local resolved_codex_home=""
 
   prepare_provider_run \
     "codex" \
@@ -174,8 +193,18 @@ query_codex() {
     done < "$MIDFLIGHT_REFS_FILE"
   fi
 
-  # ${image_args[@]+...} keeps bash 3.2 set -u happy when there are no refs.
-  codex exec \
+  # Symlinked ~/.codex becomes CODEX_HOME for this process only.
+  # An already-set CODEX_HOME, even empty or a symlink, is left alone.
+  if [ -z "${CODEX_HOME+x}" ] && [ -n "${HOME:-}" ]; then
+    resolved_codex_home="$(resolve_real_home "$HOME/.codex")"
+  fi
+  if [ -n "$resolved_codex_home" ]; then
+    codex_env=("CODEX_HOME=$resolved_codex_home")
+  fi
+
+  # ${name[@]+...} keeps bash 3.2 set -u happy when an array is empty.
+  env ${codex_env[@]+"${codex_env[@]}"} \
+    codex exec \
     --model "$codex_model" \
     -c "model_reasoning_effort=\"$codex_reasoning_effort\"" \
     --sandbox "$sandbox_mode" \
@@ -338,16 +367,13 @@ query_grok() {
     args+=(--sandbox read-only)
   fi
 
-  # A temp HOME (build_config_home, or a host override) symlinks ~/.grok at
-  # the real directory. Grok's read-only sandbox refuses a symlinked
-  # GROK_HOME, so pass that directory's canonical path to this process only.
-  # An already-set GROK_HOME is left alone. CDPATH would make cd print the
-  # destination and pollute the captured path.
-  if [ -z "${GROK_HOME+x}" ] && [ -n "${HOME:-}" ] && [ -L "$HOME/.grok" ] && [ -d "$HOME/.grok" ]; then
-    resolved_grok_home="$(CDPATH='' cd "$HOME/.grok" 2>/dev/null && pwd -P)" || resolved_grok_home=""
+  # Symlinked ~/.grok becomes GROK_HOME for this process only.
+  # An already-set GROK_HOME is left alone.
+  if [ -z "${GROK_HOME+x}" ] && [ -n "${HOME:-}" ]; then
+    resolved_grok_home="$(resolve_real_home "$HOME/.grok")"
   fi
 
-  if [ -n "$resolved_grok_home" ] && [ ! -L "$resolved_grok_home" ] && [ -d "$resolved_grok_home" ]; then
+  if [ -n "$resolved_grok_home" ]; then
     GROK_HOME="$resolved_grok_home" grok "${args[@]}" \
       > "$output_file" \
       2> "$PROVIDER_LOG_FILE"

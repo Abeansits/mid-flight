@@ -71,6 +71,12 @@ while [ \$# -gt 0 ]; do
 done
 printf '%s' "\$prompt" > "$TEST_DIR/codex_prompt.txt"
 printf '%s' "\$sandbox" > "$TEST_DIR/codex_sandbox.txt"
+printf '%s' "\${CODEX_HOME-}" > "$TEST_DIR/codex_home.txt"
+if [ -n "\${CODEX_HOME+x}" ]; then
+  printf '%s' "set" > "$TEST_DIR/codex_home_state.txt"
+else
+  printf '%s' "unset" > "$TEST_DIR/codex_home_state.txt"
+fi
 ${refresh}
 printf '%s\n' "$response" > "\$output_file"
 EOF
