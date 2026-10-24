@@ -12,6 +12,12 @@ PROVIDER_LOG_FILE=""
 PROVIDER_FAILURE_DETAIL=""
 PROVIDER_FAILURE_MESSAGE=""
 
+# On-device fm context is 4096 tokens (input + output). Leave ~1k for the reply.
+# prompts/consult.md is a few hundred bytes, so the shared consult template
+# stays. A leaner fm prompt is only worth it if that file alone approaches
+# this limit. Private Cloud Compute (--model pcc) is not checked here.
+FM_SYSTEM_PROMPT_TOKEN_LIMIT=3072
+
 provider_display_name() {
   case "$1" in
     codex) printf '%s\n' "Codex" ;;
@@ -21,6 +27,7 @@ provider_display_name() {
     oz) printf '%s\n' "Oz" ;;
     grok|grok-build) printf '%s\n' "Grok" ;;
     claude) printf '%s\n' "Claude" ;;
+    fm) printf '%s\n' "fm" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -127,6 +134,19 @@ classify_provider_failure() {
 
   if [ -n "$sandbox_matched" ]; then
     return 0
+  fi
+
+  # fm has no separate installer. A missing binary, a missing license, or an
+  # unavailable model all need the same macOS 27 setup hint. Match the last
+  # three lines, same window as the other classes, so the prompt cannot trip it.
+  if [ "$provider_name" = "fm" ]; then
+    case "$tail_normalized" in
+      *"command not found"*|*"no such file or directory"*|*"not licensed"*|*"unlicensed"*|*license*|*"not available"*|*"unavailable"*)
+        PROVIDER_FAILURE_DETAIL="fm unavailable"
+        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\`.${excerpt}"
+        return 0
+        ;;
+    esac
   fi
 
   case "$tail_normalized" in
@@ -384,6 +404,100 @@ query_grok() {
   fi
 }
 
+fm_on_device_model() {
+  case "${fm_model:-}" in
+    ""|system) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# First integer in token-count output. Empty when there is none.
+# Bash 3.2 only: macOS sed and GNU sed disagree on branch labels.
+fm_first_integer() {
+  local input="$1"
+  local line="" rest="" char="" digits=""
+
+  printf '%s\n' "$input" | while IFS= read -r line || [ -n "$line" ]; do
+    rest="$line"
+    digits=""
+    while [ -n "$rest" ]; do
+      char="${rest%"${rest#?}"}"
+      rest="${rest#?}"
+      case "$char" in
+        [0-9]) digits="${digits}${char}" ;;
+        *)
+          if [ -n "$digits" ]; then
+            printf '%s\n' "$digits"
+            return 0
+          fi
+          ;;
+      esac
+    done
+    if [ -n "$digits" ]; then
+      printf '%s\n' "$digits"
+      return 0
+    fi
+  done
+}
+
+# Count the prompt actually passed to `fm respond`. Skip the check when
+# token-count fails or its output has no integer. pcc is not preflighted.
+fm_preflight_system_prompt() {
+  local full_prompt="$1"
+  local count_output=""
+  local count_status=0
+  local token_count=""
+
+  if ! fm_on_device_model; then
+    return 0
+  fi
+
+  count_output="$(fm token-count "$full_prompt" 2>/dev/null)" || count_status=$?
+  if [ "$count_status" -ne 0 ]; then
+    return 0
+  fi
+
+  token_count="$(fm_first_integer "$count_output")" || true
+  case "$token_count" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+
+  if [ "$token_count" -gt "$FM_SYSTEM_PROMPT_TOKEN_LIMIT" ]; then
+    error_exit \
+      "fm prompt is ${token_count} tokens" \
+      "Error: the prompt is ${token_count} tokens, fm's limit is 4096, shorten the question or use another provider."
+  fi
+}
+
+query_fm() {
+  local full_prompt="$1"
+  local output_file="$2"
+
+  # Video, image-gen, and video-gen retarget before this runs. Any mode that
+  # still reaches fm is a consult-only refusal (implement, or a missed override).
+  if [ "${MODE:-}" != "consult" ]; then
+    printf 'fm is consult-only (no repo access); use -m consult\n' >&2
+    exit 2
+  fi
+
+  fm_preflight_system_prompt "$full_prompt"
+
+  prepare_provider_run \
+    "fm" \
+    "fm.log" \
+    "Error: fm query failed."
+
+  if [ -n "${fm_model:-}" ]; then
+    fm respond --model "$fm_model" "$full_prompt" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  else
+    fm respond "$full_prompt" \
+      > "$output_file" \
+      2> "$PROVIDER_LOG_FILE"
+  fi
+}
+
 query_claude() {
   local full_prompt="$1"
   local output_file="$2"
@@ -437,10 +551,13 @@ run_provider_command() {
     claude)
       query_claude "$full_prompt" "$output_file"
       ;;
+    fm)
+      query_fm "$full_prompt" "$output_file"
+      ;;
     *)
       error_exit \
         "unknown provider: $provider_name" \
-        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz, grok, claude. Check ~/.config/mid-flight/config"
+        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz, grok, claude, fm. Check ~/.config/mid-flight/config"
       ;;
   esac
 }

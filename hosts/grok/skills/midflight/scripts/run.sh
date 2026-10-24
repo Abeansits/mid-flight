@@ -75,7 +75,7 @@ if [ ${#PROVIDER_ARGS[@]} -eq 0 ]; then
     [ "$provider" = "grok-build" ] && provider="grok"
     if [ "$provider" = "grok" ] && [ "${MIDFLIGHT_ALLOW_GROK_PROVIDER:-}" != "1" ]; then
       pick=""
-      for c in codex agy opencode oz gemini claude; do
+      for c in codex agy opencode oz gemini claude fm; do
         command -v "$c" >/dev/null 2>&1 && { pick="$c"; break; }
       done
       if [ -z "$pick" ]; then

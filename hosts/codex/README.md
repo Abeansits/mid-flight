@@ -19,7 +19,7 @@ Homebrew puts `midflight` on `PATH`. Without Homebrew, run `bin/midflight` from 
 
 ## Circular provider guard
 
-When this host is Codex and `provider=codex`, `scripts/prefer-non-codex-provider.sh` warns and prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude`. Override with `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` or `--allow-codex-provider`.
+When this host is Codex and `provider=codex`, `scripts/prefer-non-codex-provider.sh` warns and prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` → `fm`. Override with `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` or `--allow-codex-provider`.
 
 See the root [README](../../README.md#3-codex-skills) for install doors.
 

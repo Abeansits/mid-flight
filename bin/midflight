@@ -45,7 +45,7 @@ version() {
 
 usage() {
   cat <<'EOF'
-midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any terminal.
+midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, Claude, or fm from any terminal.
 
 Usage:
   midflight [OPTIONS] [QUESTION...]
@@ -80,11 +80,12 @@ Calling contract:
   Stdin is ignored. -- ends options (a question that starts with - needs it).
   Implement can write the workspace. Codex, Grok, and Claude consults are
           read-only. Antigravity, Gemini, OpenCode, and Oz follow that CLI's
-          permission settings. Sandbox details: docs/standalone-usage.md.
+          permission settings. fm is consult-only (no repo access) and needs
+          macOS 27. Sandbox details: docs/standalone-usage.md.
 
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude | fm (overrides config)
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
@@ -410,6 +411,34 @@ if [ "$MODE" = "video-gen" ] && [ -n "$PROVIDER" ]; then
   esac
 fi
 
+# fm has no repo or tool access. --video / --image-gen / --video-gen keep the
+# usual retarget for a provider that cannot do that job. implement would call fm.
+effective_provider_name() {
+  local name="" cfg=""
+  if [ -n "$PROVIDER" ]; then
+    normalize_provider_name "$PROVIDER"
+    return
+  fi
+  if [ -n "$CONFIG_FILE" ]; then
+    cfg="$CONFIG_FILE"
+  elif [ -n "${HOME:-}" ] && [ -f "$HOME/.config/mid-flight/config" ]; then
+    cfg="$HOME/.config/mid-flight/config"
+  fi
+  if [ -n "$cfg" ] && [ -f "$cfg" ]; then
+    name="$(grep '^provider=' "$cfg" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+  fi
+  if [ -z "$name" ]; then
+    name="codex"
+  fi
+  normalize_provider_name "$name"
+}
+
+if [ "$MODE" = "implement" ]; then
+  case "$(effective_provider_name)" in
+    fm) die "fm is consult-only (no repo access); use -m consult" ;;
+  esac
+fi
+
 provider_label() {
   case "$1" in
     codex) printf '%s\n' "Codex" ;;
@@ -419,6 +448,7 @@ provider_label() {
     oz) printf '%s\n' "Oz" ;;
     grok) printf '%s\n' "Grok" ;;
     claude) printf '%s\n' "Claude" ;;
+    fm) printf '%s\n' "fm" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -426,8 +456,8 @@ provider_label() {
 require_known_provider() {
   local name="$1" flag="$2"
   case "$name" in
-    codex|gemini|agy|opencode|oz|grok|claude) ;;
-    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, or claude)" ;;
+    codex|gemini|agy|opencode|oz|grok|claude|fm) ;;
+    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, claude, or fm)" ;;
   esac
 }
 
@@ -633,6 +663,7 @@ build_config_home() {
         oz)                model_key="oz_model" ;;
         grok|grok-build)   model_key="grok_model" ;;
         claude)            model_key="claude_model" ;;
+        fm)                model_key="fm_model" ;;
         *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
       esac
       write_model_key "$model_key"
