@@ -138,7 +138,7 @@ classify_provider_failure() {
     case "$tail_normalized" in
       *"fm: command not found"*|*"fm:"*"no such file or directory"*|*license*|*"fm"*"unavailable"*|*"fm"*"not available"*)
         PROVIDER_FAILURE_DETAIL="fm unavailable"
-        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\`.${excerpt}"
+        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\` (or \`fm models\` on newer builds).${excerpt}"
         return 0
         ;;
     esac
@@ -406,7 +406,7 @@ fm_on_device_model() {
   esac
 }
 
-# Skip when token-count fails or prints no integer. pcc is not preflighted.
+# count-tokens -q, else token-count -q. Skip if both fail or no integer.
 fm_preflight_system_prompt() {
   local full_prompt="$1"
   local count_output=""
@@ -417,7 +417,11 @@ fm_preflight_system_prompt() {
     return 0
   fi
 
-  count_output="$(fm token-count "$full_prompt" 2>/dev/null)" || count_status=$?
+  count_output="$(fm count-tokens -q "$full_prompt" 2>/dev/null)" || count_status=$?
+  if [ "$count_status" -ne 0 ]; then
+    count_status=0
+    count_output="$(fm token-count -q "$full_prompt" 2>/dev/null)" || count_status=$?
+  fi
   if [ "$count_status" -ne 0 ]; then
     return 0
   fi

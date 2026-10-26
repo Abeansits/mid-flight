@@ -220,13 +220,12 @@ EOF
   chmod +x "$TEST_DIR/bin/claude"
 }
 
-# Stub the fm CLI: `fm token-count` prints a canned count, `fm respond`
-# records the prompt argument and prints a canned reply.
-# Args: response text, token-count stdout, token-count exit status.
+# Stub fm. Args: reply, count stdout, token-count status, count-tokens status.
 write_fm_stub() {
   local response="${1:-stub-fm-ok}"
   local token_count_output="${2:-12}"
   local token_count_status="${3:-0}"
+  local count_tokens_status="${4:-0}"
 
   cat > "$TEST_DIR/bin/fm" <<EOF
 #!/bin/bash
@@ -237,9 +236,21 @@ if [ \$# -gt 0 ]; then
 fi
 printf '%s\n' "\$cmd" >> "$TEST_DIR/fm_commands.txt"
 case "\$cmd" in
-  token-count)
-    printf '%s' "\$*" > "$TEST_DIR/fm_token_count_prompt.txt"
+  count-tokens|token-count)
+    prompt=""
+    saw_q=""
+    while [ \$# -gt 0 ]; do
+      case "\$1" in
+        -q) saw_q=yes; shift ;;
+        *) prompt="\$1"; shift ;;
+      esac
+    done
+    printf '%s' "\$prompt" > "$TEST_DIR/fm_token_count_prompt.txt"
+    printf '%s' "\$saw_q" > "$TEST_DIR/fm_token_count_quiet.txt"
     printf '%s\n' "$token_count_output"
+    if [ "\$cmd" = "count-tokens" ]; then
+      exit $count_tokens_status
+    fi
     exit $token_count_status
     ;;
   respond)

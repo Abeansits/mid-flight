@@ -12,7 +12,17 @@ reset_fm_logs() {
     "$TEST_DIR/fm_commands.txt" \
     "$TEST_DIR/fm_prompt.txt" \
     "$TEST_DIR/fm_model.txt" \
-    "$TEST_DIR/fm_token_count_prompt.txt"
+    "$TEST_DIR/fm_token_count_prompt.txt" \
+    "$TEST_DIR/fm_token_count_quiet.txt"
+}
+
+assert_no_exact_command() {
+  local command_name="$1"
+  local message="$2"
+  if [ -f "$TEST_DIR/fm_commands.txt" ] && grep -qx "$command_name" "$TEST_DIR/fm_commands.txt"; then
+    echo "FAIL: $message" >&2
+    exit 1
+  fi
 }
 
 write_config <<'EOF'
@@ -30,10 +40,14 @@ assert_contains "$(cat "$TEST_DIR/fm_prompt.txt")" \
   "You are a senior engineer being consulted mid-development." \
   "fm respond should receive the consult instructions"
 assert_eq "$(cat "$TEST_DIR/fm_token_count_prompt.txt")" "$(cat "$TEST_DIR/fm_prompt.txt")" \
-  "token-count should see the same prompt fm respond receives"
+  "count-tokens should see the same prompt fm respond receives"
+assert_eq "yes" "$(cat "$TEST_DIR/fm_token_count_quiet.txt")" \
+  "count-tokens should be called with -q"
 assert_eq "" "$(cat "$TEST_DIR/fm_model.txt")" "unset model should omit --model"
-assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "token-count" \
+assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "count-tokens" \
   "on-device consult should count tokens"
+assert_no_exact_command "token-count" \
+  "a working count-tokens must not fall back to token-count"
 assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "respond" \
   "on-device consult should then respond"
 
@@ -48,8 +62,10 @@ write_fm_stub "system-reply" "15"
 output="$(run_cli -p fm --model system "on device please")"
 assert_eq "system-reply" "$output" "--model system should return the fm reply"
 assert_eq "system" "$(cat "$TEST_DIR/fm_model.txt")" "--model system should pass through"
-assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "token-count" \
-  "--model system should preflight token-count"
+assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "count-tokens" \
+  "--model system should preflight count-tokens"
+assert_no_exact_command "token-count" \
+  "--model system should not fall back when count-tokens works"
 
 reset_fm_logs
 write_fm_stub "pcc-reply" "99999"
@@ -58,12 +74,10 @@ assert_eq "pcc-reply" "$output" "--model pcc should return the fm reply"
 assert_eq "pcc" "$(cat "$TEST_DIR/fm_model.txt")" "--model pcc should pass through"
 assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "respond" \
   "--model pcc should call respond"
-if grep -q token-count "$TEST_DIR/fm_commands.txt"; then
-  echo "FAIL: --model pcc must not run token-count" >&2
-  exit 1
-fi
+assert_no_exact_command "count-tokens" "--model pcc must not run count-tokens"
+assert_no_exact_command "token-count" "--model pcc must not run token-count"
 if [ -f "$TEST_DIR/fm_token_count_prompt.txt" ]; then
-  echo "FAIL: --model pcc must not preflight token-count" >&2
+  echo "FAIL: --model pcc must not preflight a token count" >&2
   exit 1
 fi
 
@@ -97,9 +111,26 @@ assert_contains "$(cat "$TEST_DIR/fm_prompt.txt")" "unparseable count" \
   "unparseable token-count should still deliver the prompt"
 
 reset_fm_logs
-write_fm_stub "continued-anyway" "99999" "1"
+write_fm_stub "legacy-reply" "21" "0" "64"
+output="$(run_cli -p fm "legacy count")"
+assert_eq "legacy-reply" "$output" "unknown count-tokens should fall back to token-count"
+assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "count-tokens" \
+  "fallback should try count-tokens first"
+if ! grep -qx "token-count" "$TEST_DIR/fm_commands.txt"; then
+  echo "FAIL: unknown count-tokens should fall back to token-count" >&2
+  exit 1
+fi
+assert_eq "$(cat "$TEST_DIR/fm_token_count_prompt.txt")" "$(cat "$TEST_DIR/fm_prompt.txt")" \
+  "token-count fallback should see the same prompt"
+assert_eq "yes" "$(cat "$TEST_DIR/fm_token_count_quiet.txt")" \
+  "token-count fallback should pass -q"
+
+reset_fm_logs
+write_fm_stub "continued-anyway" "99999" "1" "1"
 output="$(run_cli -p fm "count command failed")"
-assert_eq "continued-anyway" "$output" "a failing token-count should not block fm"
+assert_eq "continued-anyway" "$output" "failing count commands should not block fm"
+assert_contains "$(cat "$TEST_DIR/fm_prompt.txt")" "count command failed" \
+  "failing count commands should still deliver the prompt"
 
 # implement is refused before fm runs.
 reset_fm_logs
@@ -184,6 +215,7 @@ assert_eq "1" "$status" "missing fm should exit 1"
 assert_contains "$output" "requires macOS 27" "missing fm should mention macOS 27"
 assert_contains "$output" "sudo fm license" "missing fm should mention sudo fm license"
 assert_contains "$output" "fm available" "missing fm should mention fm available"
+assert_contains "$output" "fm models" "missing fm should mention fm models"
 
 write_fm_failure() {
   local stderr_line="$1"
@@ -209,6 +241,7 @@ set -e
 assert_eq "1" "$status" "unlicensed fm should exit 1"
 assert_contains "$output" "sudo fm license" "unlicensed fm should mention sudo fm license"
 assert_contains "$output" "fm available" "unlicensed fm should mention fm available"
+assert_contains "$output" "fm models" "unlicensed fm should mention fm models"
 
 write_fm_failure "fm: model unavailable"
 set +e
@@ -255,6 +288,53 @@ if [[ "$output" == *"sudo fm license"* ]]; then
   echo "FAIL: a context-size error must not be rewritten as a license error" >&2
   exit 1
 fi
+
+# Later builds reject --model pcc. That is fm's error, not a setup hint.
+reset_fm_logs
+cat > "$TEST_DIR/bin/fm" <<EOF
+#!/bin/bash
+set -euo pipefail
+cmd="\${1:-}"
+printf '%s\n' "\$cmd" >> "$TEST_DIR/fm_commands.txt"
+if [ "\$cmd" = "respond" ]; then
+  model=""
+  if [ \$# -gt 0 ]; then
+    shift
+  fi
+  while [ \$# -gt 0 ]; do
+    case "\$1" in
+      --model)
+        model="\$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  printf '%s' "\$model" > "$TEST_DIR/fm_model.txt"
+  printf "The value 'pcc' is invalid\n" >&2
+  exit 64
+fi
+printf 'unexpected fm command: %s\n' "\$cmd" >&2
+exit 1
+EOF
+chmod +x "$TEST_DIR/bin/fm"
+set +e
+output="$(run_cli -p fm --model pcc "rejected cloud" 2>/dev/null)"
+status=$?
+set -e
+assert_eq "1" "$status" "invalid pcc should exit 1"
+assert_contains "$output" "Error: fm query failed." "invalid pcc should use the query-failed path"
+assert_contains "$output" "The value 'pcc' is invalid" "invalid pcc should quote fm's error"
+assert_eq "pcc" "$(cat "$TEST_DIR/fm_model.txt")" \
+  "invalid pcc should still pass --model through"
+if [[ "$output" == *"sudo fm license"* ]]; then
+  echo "FAIL: invalid pcc must not be rewritten as a license error" >&2
+  exit 1
+fi
+assert_no_exact_command "count-tokens" "invalid pcc must not preflight count-tokens"
+assert_no_exact_command "token-count" "invalid pcc must not preflight token-count"
 
 write_codex_stub "codex says yes"
 write_fm_stub "fm says no" "8"
