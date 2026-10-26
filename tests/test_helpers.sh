@@ -220,12 +220,14 @@ EOF
   chmod +x "$TEST_DIR/bin/claude"
 }
 
-# Stub fm. Args: reply, count stdout, token-count status, count-tokens status.
+# Stub fm. Args: reply, count stdout, token-count status, count-tokens status, respond stderr, respond status.
 write_fm_stub() {
   local response="${1:-stub-fm-ok}"
   local token_count_output="${2:-12}"
   local token_count_status="${3:-0}"
   local count_tokens_status="${4:-0}"
+  local respond_stderr="${5:-}"
+  local respond_status="${6:-0}"
 
   cat > "$TEST_DIR/bin/fm" <<EOF
 #!/bin/bash
@@ -271,6 +273,10 @@ case "\$cmd" in
     printf '%s' "\$model" > "$TEST_DIR/fm_model.txt"
     printf '%s' "\$prompt" > "$TEST_DIR/fm_prompt.txt"
     printf '%s\n' "$response"
+    if [ -n "$respond_stderr" ]; then
+      printf '%s\n' "$respond_stderr" >&2
+    fi
+    exit $respond_status
     ;;
   *)
     printf 'unexpected fm command: %s\n' "\$cmd" >&2

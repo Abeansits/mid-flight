@@ -291,35 +291,7 @@ fi
 
 # Later builds reject --model pcc. That is fm's error, not a setup hint.
 reset_fm_logs
-cat > "$TEST_DIR/bin/fm" <<EOF
-#!/bin/bash
-set -euo pipefail
-cmd="\${1:-}"
-printf '%s\n' "\$cmd" >> "$TEST_DIR/fm_commands.txt"
-if [ "\$cmd" = "respond" ]; then
-  model=""
-  if [ \$# -gt 0 ]; then
-    shift
-  fi
-  while [ \$# -gt 0 ]; do
-    case "\$1" in
-      --model)
-        model="\$2"
-        shift 2
-        ;;
-      *)
-        shift
-        ;;
-    esac
-  done
-  printf '%s' "\$model" > "$TEST_DIR/fm_model.txt"
-  printf "The value 'pcc' is invalid\n" >&2
-  exit 64
-fi
-printf 'unexpected fm command: %s\n' "\$cmd" >&2
-exit 1
-EOF
-chmod +x "$TEST_DIR/bin/fm"
+write_fm_stub "rejected" "12" "0" "0" "The value 'pcc' is invalid" "64"
 set +e
 output="$(run_cli -p fm --model pcc "rejected cloud" 2>/dev/null)"
 status=$?
