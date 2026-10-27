@@ -12,6 +12,9 @@ PROVIDER_LOG_FILE=""
 PROVIDER_FAILURE_DETAIL=""
 PROVIDER_FAILURE_MESSAGE=""
 
+# On-device window is 4096 tokens. Refuse above 3072. pcc is not checked.
+FM_SYSTEM_PROMPT_TOKEN_LIMIT=3072
+
 provider_display_name() {
   case "$1" in
     codex) printf '%s\n' "Codex" ;;
@@ -21,6 +24,7 @@ provider_display_name() {
     oz) printf '%s\n' "Oz" ;;
     grok|grok-build) printf '%s\n' "Grok" ;;
     claude) printf '%s\n' "Claude" ;;
+    fm) printf '%s\n' "fm" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -74,9 +78,19 @@ classify_provider_failure() {
   local tail_normalized=""
   local socket_path=""
   local sandbox_matched=""
+  local esc=""
 
   provider_label="$(provider_display_name "$provider_name")"
-  excerpt="$(provider_error_excerpt "$log_file")"
+  # fm prints the error first, then usage. Keep that line and drop color.
+  if [ "$provider_name" = "fm" ] && [ -f "$log_file" ]; then
+    esc="$(printf '\033')"
+    excerpt="$(head -n 1 "$log_file" | sed "s/${esc}\[[0-9;]*[A-Za-z]//g; s/^[[:space:]]*//; s/[[:space:]]*$//")"
+    if [ -n "$excerpt" ]; then
+      excerpt="$(printf ' Details: %s\n' "$excerpt")"
+    fi
+  else
+    excerpt="$(provider_error_excerpt "$log_file")"
+  fi
 
   if [ -f "$log_file" ]; then
     log_text="$(cat "$log_file")"
@@ -127,6 +141,17 @@ classify_provider_failure() {
 
   if [ -n "$sandbox_matched" ]; then
     return 0
+  fi
+
+  # Missing binary, license, or fm model. Last three lines; phrasing names fm.
+  if [ "$provider_name" = "fm" ]; then
+    case "$tail_normalized" in
+      *"fm: command not found"*|*"fm:"*"no such file or directory"*|*license*|*"fm"*"unavailable"*|*"fm"*"not available"*)
+        PROVIDER_FAILURE_DETAIL="fm unavailable"
+        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\`.${excerpt}"
+        return 0
+        ;;
+    esac
   fi
 
   case "$tail_normalized" in
@@ -384,6 +409,64 @@ query_grok() {
   fi
 }
 
+fm_on_device_model() {
+  case "${fm_model:-}" in
+    ""|system) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# count-tokens -q. Skip if it fails or has no integer.
+fm_preflight_system_prompt() {
+  local full_prompt="$1"
+  local count_output=""
+  local token_count=""
+
+  if ! fm_on_device_model; then
+    return 0
+  fi
+
+  count_output="$(fm count-tokens -q "$full_prompt" 2>/dev/null)" || return 0
+
+  token_count="$(printf '%s\n' "$count_output" | grep -oE '[0-9]+' | head -n1)" || true
+  case "$token_count" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+
+  if [ "$token_count" -gt "$FM_SYSTEM_PROMPT_TOKEN_LIMIT" ]; then
+    error_exit \
+      "fm prompt is ${token_count} tokens" \
+      "Error: the prompt is ${token_count} tokens, above the 3072 limit (4096-token window). Shorten the question or use another provider."
+  fi
+}
+
+query_fm() {
+  local full_prompt="$1"
+  local output_file="$2"
+  local args=(respond)
+
+  if [ "${MODE:-}" != "consult" ]; then
+    printf 'fm is consult-only (no repo access); use -m consult\n' >&2
+    exit 2
+  fi
+
+  fm_preflight_system_prompt "$full_prompt"
+
+  prepare_provider_run \
+    "fm" \
+    "fm.log" \
+    "Error: fm query failed."
+
+  if [ -n "${fm_model:-}" ]; then
+    args+=(--model "$fm_model")
+  fi
+  args+=("$full_prompt")
+
+  fm "${args[@]}" \
+    > "$output_file" \
+    2> "$PROVIDER_LOG_FILE"
+}
+
 query_claude() {
   local full_prompt="$1"
   local output_file="$2"
@@ -437,10 +520,13 @@ run_provider_command() {
     claude)
       query_claude "$full_prompt" "$output_file"
       ;;
+    fm)
+      query_fm "$full_prompt" "$output_file"
+      ;;
     *)
       error_exit \
         "unknown provider: $provider_name" \
-        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz, grok, claude. Check ~/.config/mid-flight/config"
+        "Error: Unknown provider '$provider_name'. Supported: codex, gemini, agy, opencode, oz, grok, claude, fm. Check ~/.config/mid-flight/config"
       ;;
   esac
 }

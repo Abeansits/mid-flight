@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types $midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, or fm for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types $midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 ---
 
 # MidFlight — Mid-Development Consultation (Codex host)
@@ -32,7 +32,7 @@ This skill runs **inside Codex**. If MidFlight's provider is also `codex`, a con
 Default behavior (safest / least surprising):
 
 - Warn on stderr
-- Prefer the first available alternate on `PATH`: `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude`
+- Prefer the first available alternate on `PATH`: `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` → `fm`
 - If none are available, **refuse** and explain how to fix
 
 Explicit override (only when the user clearly wants Codex anyway):

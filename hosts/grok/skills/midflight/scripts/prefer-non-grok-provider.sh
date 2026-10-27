@@ -4,7 +4,7 @@
 # When the MidFlight host is Grok Build and the configured provider is also
 # grok (or alias grok-build), consulting Grok from Grok is usually a no-op
 # second opinion. Prefer a different provider
-# (codex → agy → opencode → oz → gemini → claude) unless the user explicitly
+# (codex → agy → opencode → oz → gemini → claude → fm) unless the user explicitly
 # opts in.
 #
 # Usage:
@@ -54,7 +54,7 @@ if [ "${MIDFLIGHT_ALLOW_GROK_PROVIDER:-}" = "1" ]; then
 fi
 
 pick=""
-for candidate in codex agy opencode oz gemini claude; do
+for candidate in codex agy opencode oz gemini claude fm; do
   if command -v "$candidate" >/dev/null 2>&1; then
     pick="$candidate"
     break
@@ -69,6 +69,6 @@ if [ -n "$pick" ]; then
 fi
 
 printf 'prefer-non-grok-provider: refused circular Grok→Grok consultation.\n' >&2
-printf 'No alternate provider (codex, agy, opencode, oz, gemini, claude) found on PATH.\n' >&2
+printf 'No alternate provider (codex, agy, opencode, oz, gemini, claude, fm) found on PATH.\n' >&2
 printf 'Install one of those CLIs, or set MIDFLIGHT_ALLOW_GROK_PROVIDER=1 to override.\n' >&2
 exit 1

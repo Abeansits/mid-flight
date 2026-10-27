@@ -220,6 +220,73 @@ EOF
   chmod +x "$TEST_DIR/bin/claude"
 }
 
+# Stub fm. Args: reply, count stdout, token-count status, count-tokens status, respond stderr, respond status.
+write_fm_stub() {
+  local response="${1:-stub-fm-ok}"
+  local token_count_output="${2:-12}"
+  local token_count_status="${3:-0}"
+  local count_tokens_status="${4:-0}"
+  local respond_stderr="${5:-}"
+  local respond_status="${6:-0}"
+
+  cat > "$TEST_DIR/bin/fm" <<EOF
+#!/bin/bash
+set -euo pipefail
+cmd="\${1:-}"
+if [ \$# -gt 0 ]; then
+  shift
+fi
+printf '%s\n' "\$cmd" >> "$TEST_DIR/fm_commands.txt"
+case "\$cmd" in
+  count-tokens|token-count)
+    prompt=""
+    saw_q=""
+    while [ \$# -gt 0 ]; do
+      case "\$1" in
+        -q) saw_q=yes; shift ;;
+        *) prompt="\$1"; shift ;;
+      esac
+    done
+    printf '%s' "\$prompt" > "$TEST_DIR/fm_token_count_prompt.txt"
+    printf '%s' "\$saw_q" > "$TEST_DIR/fm_token_count_quiet.txt"
+    printf '%s\n' "$token_count_output"
+    if [ "\$cmd" = "count-tokens" ]; then
+      exit $count_tokens_status
+    fi
+    exit $token_count_status
+    ;;
+  respond)
+    model=""
+    prompt=""
+    while [ \$# -gt 0 ]; do
+      case "\$1" in
+        --model)
+          model="\$2"
+          shift 2
+          ;;
+        *)
+          prompt="\$1"
+          shift
+          ;;
+      esac
+    done
+    printf '%s' "\$model" > "$TEST_DIR/fm_model.txt"
+    printf '%s' "\$prompt" > "$TEST_DIR/fm_prompt.txt"
+    printf '%s\n' "$response"
+    if [ -n "$respond_stderr" ]; then
+      printf '%s\n' "$respond_stderr" >&2
+    fi
+    exit $respond_status
+    ;;
+  *)
+    printf 'unexpected fm command: %s\n' "\$cmd" >&2
+    exit 1
+    ;;
+esac
+EOF
+  chmod +x "$TEST_DIR/bin/fm"
+}
+
 assert_eq() {
   local expected="$1"
   local actual="$2"

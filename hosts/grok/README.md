@@ -17,7 +17,7 @@ Agent Skills for [Grok Build](https://docs.x.ai/build/features/skills-plugins-ma
 
 ## Circular provider guard
 
-When `provider=grok` (or alias `grok-build`), MidFlight refuses a silent Grok→Grok consult. It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or exits if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or `--allow-grok-provider`.
+When `provider=grok` (or alias `grok-build`), MidFlight refuses a silent Grok→Grok consult. It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` → `fm` on `PATH`, or exits if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or `--allow-grok-provider`.
 
 The default provider is often `codex`, which is already a fine external consult from Grok Build (no rewrite needed).
 

@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, or fm for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 disable-model-invocation: false
 metadata:
   author: Abeansits
@@ -15,7 +15,7 @@ Supports text consultation, implementation delegation, and **video analysis**.
 
 ## Provider note (no circular Cursor→Cursor yet)
 
-There is **no** `provider=cursor` in MidFlight today (ROADMAP waitlists Cursor `agent -p --mode=ask`). Running this skill from Cursor with the default `provider=codex` (or `agy` / `opencode` / `oz` / `gemini`) is the intended path — those are different harnesses, not a circular self-consult.
+There is **no** `provider=cursor` in MidFlight today (ROADMAP waitlists Cursor `agent -p --mode=ask`). Running this skill from Cursor with the default `provider=codex` (or `agy` / `opencode` / `oz` / `gemini` / `fm`) is the intended path — those are different harnesses, not a circular self-consult. `fm` is consult-only (macOS 27).
 
 When a first-class `cursor` provider lands, revisit whether a circular guard is needed. Until then, do not invent a `provider=cursor` flag.
 

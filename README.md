@@ -21,7 +21,7 @@
 >immediately forget which file was the bug
 >scrap that plan
 >/midflight
->a tight summary goes to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, or Claude
+>a tight summary goes to Codex, OpenCode, Oz, Antigravity, Gemini, Grok, Claude, or fm
 >their answer comes back into the same session
 >no copy-paste
 >no second tab
@@ -90,6 +90,7 @@ You need `bash` and **one** provider CLI on your `PATH`, authenticated:
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — enterprise / paid API key only (see [Gemini note](#gemini-cli-status))
 - [Grok Build CLI](https://docs.x.ai/build/cli/reference) (`grok`)
 - [Claude Code CLI](https://code.claude.com/docs/en/headless) (`claude`) — useful as a provider from non-Claude hosts
+- Apple `fm` — Foundation Models CLI shipped with macOS 27. Consult only. See [Apple fm](#apple-fm)
 
 <details>
 <summary><strong>1. Claude Code plugin</strong></summary>
@@ -212,7 +213,7 @@ $midflight                          # Codex picks the question from the session
 $midflight-check-config             # validate provider setup
 ```
 
-Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
+Because the host is Codex, MidFlight will **not** silently use `provider=codex` (circular). It prefers `agy` → `opencode` → `oz` → `gemini` → `grok` → `claude` → `fm` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_CODEX_PROVIDER=1` (or pass `--allow-codex-provider`) to force Codex anyway.
 
 </details>
 
@@ -259,7 +260,7 @@ Restart Grok Build (or open the extensions modal with `/skills`), then:
 /midflight-check-config             # validate provider setup
 ```
 
-Because the host is Grok Build, MidFlight will **not** silently use `provider=grok` (circular). It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` (or pass `--allow-grok-provider`) to force Grok anyway. The default provider is often `codex`, which is already a fine external consult.
+Because the host is Grok Build, MidFlight will **not** silently use `provider=grok` (circular). It prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` → `fm` on `PATH`, or refuses if none are available. Set `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` (or pass `--allow-grok-provider`) to force Grok anyway. The default provider is often `codex`, which is already a fine external consult.
 
 </details>
 
@@ -327,8 +328,21 @@ There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cur
 | `gemini` | Yes | Yes | Yes | No | `gemini_model` | — |
 | `grok` | Yes | Yes | No | Yes | `grok_model` | `grok_effort` |
 | `claude` | Yes | Yes | No | No | `claude_model` | — |
+| `fm` | Yes | No | No | No | `fm_model` | consult-only; macOS 27; on-device context 4096 tokens |
 
 `provider=antigravity` is an alias for `agy`. `provider=grok-build` is an alias for `grok`.
+
+### Apple fm
+
+`fm` is Apple's Foundation Models CLI. It ships with macOS 27. One call is `fm respond [--model system] '<prompt>'`. `fm available` checks the model. Token preflight is `fm count-tokens -q`. One-time setup is `sudo fm license`.
+
+`fm` has no repo access and no tools. MidFlight uses it for consult, including as either side of a dual-consult. Any other mode exits 2: `fm is consult-only (no repo access); use -m consult`. `--video`, `--image-gen`, and `--video-gen` keep their usual routing for a provider that cannot do that job.
+
+`--model system` is the on-device model and the CLI default. Leave `--model` unset and MidFlight omits `fm`'s `--model` flag. Config key: `fm_model`. Any other value is passed through. macOS 27.0 accepts `system` only, and MidFlight shows fm's own error (the first line, for example `The value 'pcc' is invalid`).
+
+The on-device context window is 4096 tokens (input and output together). Before `fm respond`, MidFlight runs `fm count-tokens -q` on the full prompt it is about to send (instructions, question, and any context). Above 3072 tokens it exits 1 and asks you to shorten the question or use another provider, leaving about 1k tokens for the reply. A model other than `system` is not preflighted. If `fm count-tokens` exits non-zero, or its output has no integer, the consult continues.
+
+`prompts/consult.md` is a few hundred bytes, so `fm` uses that shared consult template.
 
 From Claude Code, prefer a non-`claude` provider — `provider=claude` is circular on that host (same harness consulting itself).
 
@@ -354,6 +368,7 @@ These consult paths do not get a read-only flag. Writes follow that CLI's own pe
 - Gemini consult passes no approval mode. `--approval-mode=plan` is documented as read-only, and headless plan mode switches to YOLO when the plan exits, so MidFlight does not pass it.
 - OpenCode consult passes no permission flag. `edit` defaults to allow. `opencode run --auto` approves permissions that are not denied. `OPENCODE_PERMISSION` is merged with user config, so it is not a lock.
 - Oz consult passes no permission flag. Writes follow the agent profile (`--profile` when `oz_profile` is set). The default CLI profile can read and write. `--share` shares the session. It does not sandbox the agent.
+- `fm` consult passes the prompt to `fm respond` and nothing else. There is no sandbox flag because `fm` cannot read or write the repo.
 
 Video analysis runs on Antigravity or Gemini, so it has no read-only flag either.
 
@@ -383,11 +398,12 @@ oz_profile=
 grok_model=
 grok_effort=
 claude_model=
+fm_model=
 ```
 
 | Setting | Default | Description |
 |---|---|---|
-| `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude` |
+| `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, `claude`, or `fm` |
 | `codex_model` | `gpt-6-sol` | Codex model |
 | `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
@@ -402,6 +418,7 @@ claude_model=
 | `grok_model` | unset | Grok model id; blank uses the CLI default |
 | `grok_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
 | `claude_model` | unset | Claude model; blank uses the CLI default |
+| `fm_model` | unset | `system` (on-device); blank omits `--model`. Other values are passed through |
 
 Config is independent of Claude Code (or any other host), so you can tune MidFlight without touching other tools.
 
@@ -434,6 +451,8 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 | `Oz query failed` | Auth or provider error | `oz --help` or `oz whoami` |
 | `Grok query failed` | Auth or provider error | `grok --version`; run `grok login` |
 | `Claude query failed` | Auth or provider error | `claude --version`; confirm Claude Code login |
+| `fm requires macOS 27` | `fm` is missing, unlicensed, or the model is unavailable | macOS 27, then `sudo fm license`, then `fm available` |
+| `above the 3072 limit` | On-device prompt is over 3072 tokens (4096 window) | Shorten the question or use another provider. A model other than `system` is not preflighted |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin and is waiting for EOF | Upgrade MidFlight; stdin is now detached |
 | `Video file exceeds 20MB limit` | Gemini inline-file limit | Compress or trim the video |

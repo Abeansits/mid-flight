@@ -45,7 +45,7 @@ version() {
 
 usage() {
   cat <<'EOF'
-midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any terminal.
+midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, Claude, or fm from any terminal.
 
 Usage:
   midflight [OPTIONS] [QUESTION...]
@@ -80,11 +80,12 @@ Calling contract:
   Stdin is ignored. -- ends options (a question that starts with - needs it).
   Implement can write the workspace. Codex, Grok, and Claude consults are
           read-only. Antigravity, Gemini, OpenCode, and Oz follow that CLI's
-          permission settings. Sandbox details: docs/standalone-usage.md.
+          permission settings. fm is consult-only (no repo access) and needs
+          macOS 27. Sandbox details: docs/standalone-usage.md.
 
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude | fm (overrides config)
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
@@ -419,6 +420,7 @@ provider_label() {
     oz) printf '%s\n' "Oz" ;;
     grok) printf '%s\n' "Grok" ;;
     claude) printf '%s\n' "Claude" ;;
+    fm) printf '%s\n' "fm" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -426,8 +428,8 @@ provider_label() {
 require_known_provider() {
   local name="$1" flag="$2"
   case "$name" in
-    codex|gemini|agy|opencode|oz|grok|claude) ;;
-    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, or claude)" ;;
+    codex|gemini|agy|opencode|oz|grok|claude|fm) ;;
+    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, claude, or fm)" ;;
   esac
 }
 
@@ -633,6 +635,7 @@ build_config_home() {
         oz)                model_key="oz_model" ;;
         grok|grok-build)   model_key="grok_model" ;;
         claude)            model_key="claude_model" ;;
+        fm)                model_key="fm_model" ;;
         *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
       esac
       write_model_key "$model_key"
