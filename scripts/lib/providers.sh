@@ -78,9 +78,19 @@ classify_provider_failure() {
   local tail_normalized=""
   local socket_path=""
   local sandbox_matched=""
+  local esc=""
 
   provider_label="$(provider_display_name "$provider_name")"
-  excerpt="$(provider_error_excerpt "$log_file")"
+  # fm prints the error first, then usage. Keep that line and drop color.
+  if [ "$provider_name" = "fm" ] && [ -f "$log_file" ]; then
+    esc="$(printf '\033')"
+    excerpt="$(head -n 1 "$log_file" | sed "s/${esc}\[[0-9;]*[A-Za-z]//g; s/^[[:space:]]*//; s/[[:space:]]*$//")"
+    if [ -n "$excerpt" ]; then
+      excerpt="$(printf ' Details: %s\n' "$excerpt")"
+    fi
+  else
+    excerpt="$(provider_error_excerpt "$log_file")"
+  fi
 
   if [ -f "$log_file" ]; then
     log_text="$(cat "$log_file")"
@@ -138,7 +148,7 @@ classify_provider_failure() {
     case "$tail_normalized" in
       *"fm: command not found"*|*"fm:"*"no such file or directory"*|*license*|*"fm"*"unavailable"*|*"fm"*"not available"*)
         PROVIDER_FAILURE_DETAIL="fm unavailable"
-        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\` (or \`fm models\` on newer builds).${excerpt}"
+        PROVIDER_FAILURE_MESSAGE="Error: fm requires macOS 27 and \`sudo fm license\`, then \`fm available\`.${excerpt}"
         return 0
         ;;
     esac
@@ -406,25 +416,17 @@ fm_on_device_model() {
   esac
 }
 
-# count-tokens -q, else token-count -q. Skip if both fail or no integer.
+# count-tokens -q. Skip if it fails or has no integer.
 fm_preflight_system_prompt() {
   local full_prompt="$1"
   local count_output=""
-  local count_status=0
   local token_count=""
 
   if ! fm_on_device_model; then
     return 0
   fi
 
-  count_output="$(fm count-tokens -q "$full_prompt" 2>/dev/null)" || count_status=$?
-  if [ "$count_status" -ne 0 ]; then
-    count_status=0
-    count_output="$(fm token-count -q "$full_prompt" 2>/dev/null)" || count_status=$?
-  fi
-  if [ "$count_status" -ne 0 ]; then
-    return 0
-  fi
+  count_output="$(fm count-tokens -q "$full_prompt" 2>/dev/null)" || return 0
 
   token_count="$(printf '%s\n' "$count_output" | grep -oE '[0-9]+' | head -n1)" || true
   case "$token_count" in

@@ -51,7 +51,7 @@ rm -rf ~/.local/lib/mid-flight /usr/local/lib/mid-flight
 
 - `bash`
 - A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, `claude`, or `fm`),
-  installed and authenticated. `fm` ships with macOS 27; one-time setup is `sudo fm license`, then `fm available` (or `fm models`).
+  installed and authenticated. `fm` ships with macOS 27; one-time setup is `sudo fm license`, then `fm available`.
 - Optionally `~/.config/mid-flight/config` to pick the provider and models.
   Without it, the engine's defaults apply (provider `codex`). See the
   [README config section](../README.md#config).
@@ -95,7 +95,7 @@ Consult passes a read-only flag only when that CLI has one MidFlight can trust f
 
 Antigravity, Gemini, OpenCode, and Oz consults do not get a read-only flag. Antigravity headless mode auto-allows workspace file writes even when `--dangerously-skip-permissions` is omitted. For those providers the consult prompt is an instruction, and writes follow that CLI's permission settings. Limits are in the README section [Consult and file writes](../README.md#consult-and-file-writes).
 
-`fm` is Apple's Foundation Models CLI (macOS 27). It is consult-only: it has no repo access and no tools, so implement exits 2 (`fm is consult-only (no repo access); use -m consult`). It is allowed as a dual-consult partner. `--model` maps to `fm --model` (`system` on-device, or `pcc` where that build still accepts it) and is omitted when unset. Later builds reject `pcc` and that error is shown as-is. The on-device context window is 4096 tokens (input + output). MidFlight preflights with `fm count-tokens -q`, then `fm token-count -q`, and exits 1 above 3072 tokens so about 1k remain for the reply. `pcc` is not preflighted. A missing binary, a missing license, or an unavailable model reports `sudo fm license` and `fm available` (or `fm models`). See [Apple fm](../README.md#apple-fm).
+`fm` is Apple's Foundation Models CLI (macOS 27). It is consult-only: it has no repo access and no tools, so implement exits 2 (`fm is consult-only (no repo access); use -m consult`). It is allowed as a dual-consult partner. `--model` maps to `fm --model` (`system` on-device) and is omitted when unset. Other values are passed through; macOS 27.0 accepts `system` only, and fm's error is shown as-is. The on-device context window is 4096 tokens (input + output). MidFlight preflights with `fm count-tokens -q` and exits 1 above 3072 tokens so about 1k remain for the reply. A model other than `system` is not preflighted. A missing binary, a missing license, or an unavailable model reports `sudo fm license` and `fm available`. See [Apple fm](../README.md#apple-fm).
 
 ### Dual-consult
 
@@ -243,7 +243,7 @@ environment is passed through unchanged.
 - `-p codex --model gpt-6-sol` → sets `codex_model`
 - `-p gemini --model gemini-3.1-pro-preview` → sets `gemini_model`
 - `-p agy --model gemini-3.1-pro-high` → sets `agy_model`
-- `-p fm --model pcc` → sets `fm_model` (`system`, or `pcc` when the build accepts it; blank omits `--model`)
+- `-p fm --model system` → sets `fm_model` (`system` on-device; blank omits `--model`; other values are passed through)
 - `--model gemini-3.8-flash` (no `-p`) → sets the model for whatever provider is
   active in your config
 - `--video clip.mp4 --model gemini-3.8-flash` (no `-p`) → sets `agy_model` and

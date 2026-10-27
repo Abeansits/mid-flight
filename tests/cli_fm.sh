@@ -111,26 +111,13 @@ assert_contains "$(cat "$TEST_DIR/fm_prompt.txt")" "unparseable count" \
   "unparseable token-count should still deliver the prompt"
 
 reset_fm_logs
-write_fm_stub "legacy-reply" "21" "0" "64"
-output="$(run_cli -p fm "legacy count")"
-assert_eq "legacy-reply" "$output" "unknown count-tokens should fall back to token-count"
-assert_contains "$(cat "$TEST_DIR/fm_commands.txt")" "count-tokens" \
-  "fallback should try count-tokens first"
-if ! grep -qx "token-count" "$TEST_DIR/fm_commands.txt"; then
-  echo "FAIL: unknown count-tokens should fall back to token-count" >&2
-  exit 1
-fi
-assert_eq "$(cat "$TEST_DIR/fm_token_count_prompt.txt")" "$(cat "$TEST_DIR/fm_prompt.txt")" \
-  "token-count fallback should see the same prompt"
-assert_eq "yes" "$(cat "$TEST_DIR/fm_token_count_quiet.txt")" \
-  "token-count fallback should pass -q"
-
-reset_fm_logs
-write_fm_stub "continued-anyway" "99999" "1" "1"
+write_fm_stub "continued-anyway" "99999" "0" "1"
 output="$(run_cli -p fm "count command failed")"
-assert_eq "continued-anyway" "$output" "failing count commands should not block fm"
+assert_eq "continued-anyway" "$output" "a failing count-tokens should not block fm"
 assert_contains "$(cat "$TEST_DIR/fm_prompt.txt")" "count command failed" \
-  "failing count commands should still deliver the prompt"
+  "a failing count-tokens should still deliver the prompt"
+assert_no_exact_command "token-count" \
+  "a failing count-tokens must not try token-count"
 
 # implement is refused before fm runs.
 reset_fm_logs
@@ -215,25 +202,24 @@ assert_eq "1" "$status" "missing fm should exit 1"
 assert_contains "$output" "requires macOS 27" "missing fm should mention macOS 27"
 assert_contains "$output" "sudo fm license" "missing fm should mention sudo fm license"
 assert_contains "$output" "fm available" "missing fm should mention fm available"
-assert_contains "$output" "fm models" "missing fm should mention fm models"
+if [[ "$output" == *"fm models"* ]]; then
+  echo "FAIL: missing fm must not mention fm models" >&2
+  exit 1
+fi
 
 write_fm_failure() {
   local stderr_line="$1"
   cat > "$TEST_DIR/bin/fm" <<EOF
 #!/bin/bash
 set -euo pipefail
-cmd="\${1:-}"
-if [ "\$cmd" = "token-count" ]; then
-  printf '10\n'
-  exit 0
-fi
 printf '%s\n' "$stderr_line" >&2
 exit 1
 EOF
   chmod +x "$TEST_DIR/bin/fm"
 }
 
-write_fm_failure "fm is not licensed"
+esc="$(printf '\033')"
+write_fm_failure "${esc}[31mfm is not licensed${esc}[0m"
 set +e
 output="$(run_cli -p fm "license check" 2>/dev/null)"
 status=$?
@@ -241,7 +227,15 @@ set -e
 assert_eq "1" "$status" "unlicensed fm should exit 1"
 assert_contains "$output" "sudo fm license" "unlicensed fm should mention sudo fm license"
 assert_contains "$output" "fm available" "unlicensed fm should mention fm available"
-assert_contains "$output" "fm models" "unlicensed fm should mention fm models"
+assert_contains "$output" "fm is not licensed" "unlicensed fm should quote the plain error"
+if [[ "$output" == *"$esc"* ]]; then
+  echo "FAIL: fm error text must drop ANSI color codes" >&2
+  exit 1
+fi
+if [[ "$output" == *"fm models"* ]]; then
+  echo "FAIL: unlicensed fm must not mention fm models" >&2
+  exit 1
+fi
 
 write_fm_failure "fm: model unavailable"
 set +e
@@ -289,16 +283,27 @@ if [[ "$output" == *"sudo fm license"* ]]; then
   exit 1
 fi
 
-# Later builds reject --model pcc. That is fm's error, not a setup hint.
+# macOS 27.0 rejects --model pcc. The error is the first stderr line; usage follows.
 reset_fm_logs
-write_fm_stub "rejected" "12" "0" "0" "The value 'pcc' is invalid" "64"
+pcc_stderr="$(printf '%s\n' \
+  "Error: The value 'pcc' is invalid for '--model <model>'. Please provide one of 'system'." \
+  "OVERVIEW: Run a prompt against the on-device model." \
+  "USAGE: fm respond --model <model> <prompt>" \
+  "OPTIONS:" \
+  "  --model <model>  Model name.")"
+write_fm_stub "rejected" "12" "0" "0" "$pcc_stderr" "64"
 set +e
 output="$(run_cli -p fm --model pcc "rejected cloud" 2>/dev/null)"
 status=$?
 set -e
 assert_eq "1" "$status" "invalid pcc should exit 1"
 assert_contains "$output" "Error: fm query failed." "invalid pcc should use the query-failed path"
-assert_contains "$output" "The value 'pcc' is invalid" "invalid pcc should quote fm's error"
+assert_contains "$output" "Error: The value 'pcc' is invalid for '--model <model>'. Please provide one of 'system'." \
+  "invalid pcc should keep fm's first error line"
+if [[ "$output" == *"OVERVIEW:"* ]]; then
+  echo "FAIL: invalid pcc details must not keep the usage tail" >&2
+  exit 1
+fi
 assert_eq "pcc" "$(cat "$TEST_DIR/fm_model.txt")" \
   "invalid pcc should still pass --model through"
 if [[ "$output" == *"sudo fm license"* ]]; then

@@ -334,13 +334,13 @@ There is **no** `provider=cursor` yet, so circular `host=Cursor` + `provider=cur
 
 ### Apple fm
 
-`fm` is Apple's Foundation Models CLI. It ships with macOS 27. One call is `fm respond [--model system|pcc] '<prompt>'`. `fm available` (or `fm models` on newer builds) checks the model. Token preflight is `fm count-tokens -q`, then `fm token-count -q` on older builds. One-time setup is `sudo fm license`.
+`fm` is Apple's Foundation Models CLI. It ships with macOS 27. One call is `fm respond [--model system] '<prompt>'`. `fm available` checks the model. Token preflight is `fm count-tokens -q`. One-time setup is `sudo fm license`.
 
 `fm` has no repo access and no tools. MidFlight uses it for consult, including as either side of a dual-consult. Any other mode exits 2: `fm is consult-only (no repo access); use -m consult`. `--video`, `--image-gen`, and `--video-gen` keep their usual routing for a provider that cannot do that job.
 
-`--model system` is the on-device model and the CLI default. `--model pcc` is Private Cloud Compute on builds that still accept it. Later builds reject `pcc` (`The value 'pcc' is invalid`) and MidFlight shows that as fm's own error. Leave `--model` unset and MidFlight omits `fm`'s `--model` flag. Config key: `fm_model`.
+`--model system` is the on-device model and the CLI default. Leave `--model` unset and MidFlight omits `fm`'s `--model` flag. Config key: `fm_model`. Any other value is passed through. macOS 27.0 accepts `system` only, and MidFlight shows fm's own error (the first line, for example `The value 'pcc' is invalid`).
 
-The on-device context window is 4096 tokens (input and output together). Before `fm respond`, MidFlight runs `fm count-tokens -q` on the full prompt it is about to send (instructions, question, and any context). If that exits non-zero, it tries `fm token-count -q`. Above 3072 tokens it exits 1 and asks you to shorten the question or use another provider, leaving about 1k tokens for the reply. `pcc` is not preflighted. If both count commands fail, or the output has no integer, the consult continues.
+The on-device context window is 4096 tokens (input and output together). Before `fm respond`, MidFlight runs `fm count-tokens -q` on the full prompt it is about to send (instructions, question, and any context). Above 3072 tokens it exits 1 and asks you to shorten the question or use another provider, leaving about 1k tokens for the reply. A model other than `system` is not preflighted. If `fm count-tokens` exits non-zero, or its output has no integer, the consult continues.
 
 `prompts/consult.md` is a few hundred bytes, so `fm` uses that shared consult template.
 
@@ -418,7 +418,7 @@ fm_model=
 | `grok_model` | unset | Grok model id; blank uses the CLI default |
 | `grok_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
 | `claude_model` | unset | Claude model; blank uses the CLI default |
-| `fm_model` | unset | `system` (on-device) or `pcc` when the build still accepts it; blank omits `--model` |
+| `fm_model` | unset | `system` (on-device); blank omits `--model`. Other values are passed through |
 
 Config is independent of Claude Code (or any other host), so you can tune MidFlight without touching other tools.
 
@@ -451,8 +451,8 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 | `Oz query failed` | Auth or provider error | `oz --help` or `oz whoami` |
 | `Grok query failed` | Auth or provider error | `grok --version`; run `grok login` |
 | `Claude query failed` | Auth or provider error | `claude --version`; confirm Claude Code login |
-| `fm requires macOS 27` | `fm` is missing, unlicensed, or the model is unavailable | macOS 27, then `sudo fm license`, then `fm available` (or `fm models`) |
-| `above the 3072 limit` | On-device prompt is over 3072 tokens (4096 window) | Shorten the question or use another provider. `pcc` is not preflighted |
+| `fm requires macOS 27` | `fm` is missing, unlicensed, or the model is unavailable | macOS 27, then `sudo fm license`, then `fm available` |
+| `above the 3072 limit` | On-device prompt is over 3072 tokens (4096 window) | Shorten the question or use another provider. A model other than `system` is not preflighted |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin and is waiting for EOF | Upgrade MidFlight; stdin is now detached |
 | `Video file exceeds 20MB limit` | Gemini inline-file limit | Compress or trim the video |
