@@ -146,4 +146,52 @@ assert_not_contains "$output" "installed" \
 assert_not_contains "$output" "authenticated" \
   "unrecognized failure after a timeout question should not say authenticated"
 
+# Error marker early in a noisy log (e.g. error: followed by 10+ model lines)
+# should surface in stdout Details instead of being pushed out by the tail.
+printf 'provider=%s\n' "agy" > "$HOME/.config/mid-flight/config"
+cat > "$TEST_DIR/bin/agy" <<'EOF'
+#!/bin/bash
+printf '%s\n' 'error: invalid model selection: model gemini-4-hydrogen-high is not recognized' >&2
+printf '%s\n' 'Available models:' >&2
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  printf '  Model Option %d   (Thinking)\n' "$i" >&2
+done
+exit 1
+EOF
+chmod +x "$TEST_DIR/bin/agy"
+
+set +e
+stdout_only="$(run_query "$QUERY_FILE" consult 2>/dev/null)"
+status=$?
+set -e
+
+assert_eq "1" "$status" "agy invalid model failure should exit 1"
+assert_contains "$stdout_only" "Error: Antigravity query failed. Details: error: invalid model selection: model gemini-4-hydrogen-high is not recognized" \
+  "stdout Error should carry the first error: line rather than the model list tail"
+assert_not_contains "$stdout_only" "Model Option 10" \
+  "stdout Error should not fall back to the model list tail when an error line matched"
+
+# Also check Error and fatal markers followed by ten lines.
+for marker_line in "Error: workspace quota check failed" "fatal: unable to reach backend"; do
+  printf '%s\n' "$marker_line" > "$TEST_DIR/marker_line.txt"
+  cat > "$TEST_DIR/bin/agy" <<EOF
+#!/bin/bash
+cat "$TEST_DIR/marker_line.txt" >&2
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  printf '  trailing line %d\n' "\$i" >&2
+done
+exit 1
+EOF
+  chmod +x "$TEST_DIR/bin/agy"
+
+  set +e
+  stdout_only="$(run_query "$QUERY_FILE" consult 2>/dev/null)"
+  status=$?
+  set -e
+
+  assert_eq "1" "$status" "marker failure ($marker_line) should exit 1"
+  assert_contains "$stdout_only" "Details: $marker_line" \
+    "stdout Error should surface '$marker_line'"
+done
+
 echo "PASS: unrecognized provider failures keep the excerpt and skip install/login"

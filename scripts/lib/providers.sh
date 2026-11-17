@@ -27,13 +27,21 @@ provider_display_name() {
 
 provider_error_excerpt() {
   local log_file="$1"
+  local match=""
   local excerpt=""
 
   if [ ! -f "$log_file" ]; then
     return 0
   fi
 
-  excerpt="$(tail -n 3 "$log_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  match="$(grep -E '(error:|Error|fatal)' "$log_file" 2>/dev/null | head -n 1 || true)"
+  if [ -n "$match" ]; then
+    excerpt="$(printf '%s\n' "$match" | tr '\r' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+  fi
+
+  if [ -z "$excerpt" ]; then
+    excerpt="$(tail -n 3 "$log_file" | tr '\n\r' '  ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+  fi
 
   if [ -n "$excerpt" ]; then
     printf ' Details: %s\n' "$excerpt"
