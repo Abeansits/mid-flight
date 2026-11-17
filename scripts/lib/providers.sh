@@ -29,29 +29,31 @@ provider_error_excerpt() {
   local log_file="$1"
   local excerpt=""
   local line=""
-  local collapsed=""
+  local picked=""
 
   if [ ! -f "$log_file" ]; then
     return 0
   fi
 
   # First line that states the failure. Markers keep this case: error:, Error, fatal.
-  # No match keeps the last three lines, collapsed onto one line.
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       *"error:"*|*"Error"*|*"fatal"*)
-        collapsed="$(printf '%s\n' "$line" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
-        if [ -n "$collapsed" ]; then
-          excerpt="$collapsed"
-          break
-        fi
+        picked="$line"
+        break
         ;;
     esac
   done < "$log_file"
 
-  if [ -z "$excerpt" ]; then
-    excerpt="$(tail -n 3 "$log_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  # No marker: the old detail is the last three lines.
+  if [ -z "$picked" ]; then
+    picked="$(tail -n 3 "$log_file")"
   fi
+
+  # Same collapse as the three-line tail, then that tail's one-line budget
+  # (three 80-column lines). A matched line uses this cap too.
+  excerpt="$(printf '%s\n' "$picked" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  excerpt="${excerpt:0:240}"
 
   if [ -n "$excerpt" ]; then
     printf ' Details: %s\n' "$excerpt"

@@ -124,4 +124,20 @@ assert_contains "$stdout" \
 assert_not_contains "$stdout" "not the marker" \
   "uppercase ERROR: should not replace the tail"
 
+pad=""
+i=0
+while [ "$i" -lt 300 ]; do
+  pad="${pad}x"
+  i=$((i + 1))
+done
+write_agy_failure "error: model rejected ${pad} ENDMARKER"
+run_failure
+assert_contains "$stdout" "Details: error: model rejected " \
+  "over-long error line should still start with the reason"
+assert_not_contains "$stdout" "ENDMARKER" \
+  "over-long error line should be truncated"
+detail="${stdout#*Details: }"
+detail="${detail%%$'\n'*}"
+assert_eq "240" "${#detail}" "over-long error line should stop at 240 characters"
+
 echo "PASS: stdout Error prefers the provider error line and otherwise keeps the tail"
