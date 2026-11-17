@@ -88,6 +88,7 @@ Options:
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
+      --effort LEVEL     effort level for the active provider (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
@@ -126,6 +127,7 @@ Examples:
   midflight -p codex --dual grok "SSE or WebSockets?"
   midflight --providers codex,agy "SSE or WebSockets?"
   midflight -p agy --model gemini-3.1-pro-high "quick take on this approach"
+  midflight -p agy --model gemini-3.1-pro-high --effort high "quick take on this approach"
   midflight --context notes.md -i "src/*.ts" "where is the leak?"
   midflight --git-status --diff "does this change look right?"
   midflight --diff --context notes.md "any race conditions in the unstaged work?"
@@ -151,6 +153,7 @@ PROVIDER=""
 DUAL_PROVIDER=""
 PROVIDERS_LIST=""
 MODEL=""
+EFFORT=""
 CONFIG_FILE=""
 QUERY_FILE=""
 CONTEXT_FILE=""
@@ -192,6 +195,7 @@ while [ $# -gt 0 ]; do
       ;;
     --providers)     require_option_value "a provider list" "$@"; PROVIDERS_LIST="$2"; shift 2 ;;
     --model)         require_option_value "a model name" "$@"; MODEL="$2"; shift 2 ;;
+    --effort)        require_option_value "an effort level" "$@"; EFFORT="$2"; shift 2 ;;
     -c|--config)     require_option_value "a config file" "$@"; CONFIG_FILE="$2"; shift 2 ;;
     -f|--query-file) require_option_value "a query file" "$@"; QUERY_FILE="$2"; shift 2 ;;
     --context)       require_option_value "a context file" "$@"; CONTEXT_FILE="$2"; shift 2 ;;
@@ -450,6 +454,9 @@ if [ "$want_dual" -eq 1 ]; then
   if [ -n "$MODEL" ]; then
     die "--model cannot be combined with dual-consult; set per-provider models in ~/.config/mid-flight/config"
   fi
+  if [ -n "$EFFORT" ]; then
+    die "--effort cannot be combined with dual-consult; set per-provider efforts in ~/.config/mid-flight/config"
+  fi
   if [ -z "$DUAL_PROVIDER" ] && [ -z "$PROVIDERS_LIST" ]; then
     die "dual-consult requires --dual PROVIDER or --providers A,B"
   fi
@@ -637,6 +644,67 @@ build_config_home() {
       esac
       write_model_key "$model_key"
     fi
+  fi
+
+  if [ -n "$EFFORT" ]; then
+    local effort_provider="$PROVIDER"
+    if [ -z "$effort_provider" ]; then
+      effort_provider="$(grep '^provider=' "$config" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)"
+    fi
+    [ -z "$effort_provider" ] && effort_provider="codex"
+    case "$effort_provider" in
+      antigravity) effort_provider="agy" ;;
+      grok-build)  effort_provider="grok" ;;
+    esac
+
+    # Keep in step with resolve_provider_for_mode in scripts/lib/config.sh.
+    # The staged key has to be the one the provider that actually runs reads.
+    if [ "$MODE" = "video-gen" ]; then
+      case "$effort_provider" in
+        grok) ;;
+        *) effort_provider="grok" ;;
+      esac
+    elif [ "$MODE" = "image-gen" ]; then
+      case "$effort_provider" in
+        grok|codex) ;;
+        *)
+          if command -v grok >/dev/null 2>&1; then
+            effort_provider="grok"
+          elif command -v codex >/dev/null 2>&1; then
+            effort_provider="codex"
+          else
+            effort_provider="grok"
+          fi
+          ;;
+      esac
+    elif [ "$MODE" = "video" ]; then
+      case "$effort_provider" in
+        gemini|agy) ;;
+        *)
+          if command -v agy >/dev/null 2>&1; then
+            effort_provider="agy"
+          else
+            effort_provider="gemini"
+          fi
+          ;;
+      esac
+    fi
+
+    local effort_key=""
+    case "$effort_provider" in
+      codex) effort_key="codex_reasoning_effort" ;;
+      agy)   effort_key="agy_effort" ;;
+      grok)  effort_key="grok_effort" ;;
+      gemini|opencode|oz|claude)
+        die "--effort is not supported for provider '$effort_provider'"
+        ;;
+      *)
+        die "unknown provider '$effort_provider' for --effort mapping"
+        ;;
+    esac
+    grep -v "^${effort_key}=" "$config" > "$config.tmp" 2>/dev/null || true
+    printf '%s=%s\n' "$effort_key" "$EFFORT" >> "$config.tmp"
+    mv "$config.tmp" "$config"
   fi
 
   CONFIG_HOME="$home_dir"
@@ -968,7 +1036,7 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   # that second so a file it writes is strictly newer than the stamp.
   sleep 1
   set +e
-  if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
+  if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$EFFORT" ] || [ -n "$CONFIG_FILE" ]; then
     CONFIG_HOME=""
     build_config_home
     HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
@@ -1001,7 +1069,7 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   exit "$ec"
 fi
 
-if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
+if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$EFFORT" ] || [ -n "$CONFIG_FILE" ]; then
   CONFIG_HOME=""
   build_config_home
   HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"

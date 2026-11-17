@@ -11,7 +11,7 @@ stdout_file="$TEST_DIR/stdout.txt"
 stderr_file="$TEST_DIR/stderr.txt"
 
 # --- bare value-taking flags exit 2 with a usage line, nothing on stdout ---
-bare_flags=(-m -p -f -c -i --context --model --providers --video --timeout)
+bare_flags=(-m -p -f -c -i --context --model --effort --providers --video --timeout)
 for flag in "${bare_flags[@]}"; do
   set +e
   run_cli "$flag" >"$stdout_file" 2>"$stderr_file"
@@ -51,7 +51,7 @@ EOF
 write_gemini_stub "should-not-run"
 
 value_flags=(
-  -m -p --dual --providers --model -c -f --context -i
+  -m -p --dual --providers --model --effort -c -f --context -i
   --video --image-gen --video-gen --ref --aspect --timeout
 )
 for flag in "${value_flags[@]}"; do
