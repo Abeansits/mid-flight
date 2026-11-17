@@ -160,6 +160,56 @@ STUB
   chmod +x "$TEST_DIR/bin/codex"
 done
 
+# Immediate failure under a long --timeout must not print the watchdog's
+# "Killed" job-control line, and must not leave its sleep running.
+cat > "$TEST_DIR/bin/codex" <<'STUB'
+#!/bin/bash
+echo "provider exploded" >&2
+exit 1
+STUB
+chmod +x "$TEST_DIR/bin/codex"
+
+fast_out="$TEST_DIR/fast.stdout"
+fast_err="$TEST_DIR/fast.stderr"
+start=$(date +%s)
+set +e
+run_cli --timeout 60 "fast failure must not report the watchdog as killed?" >"$fast_out" 2>"$fast_err"
+status=$?
+set -e
+end=$(date +%s)
+elapsed=$(( end - start ))
+fast_stdout="$(cat "$fast_out")"
+fast_stderr="$(cat "$fast_err")"
+
+assert_eq "1" "$status" "immediate provider failure under --timeout 60 must exit 1"
+if [ "$elapsed" -gt 5 ]; then
+  echo "FAIL: immediate provider failure under --timeout 60 took ${elapsed}s" >&2
+  exit 1
+fi
+assert_contains "$fast_stdout" "Codex query failed" \
+  "engine failure should stay on stdout"
+assert_contains "$fast_stderr" "provider exploded" \
+  "provider error should stay on stderr"
+if printf '%s\n' "$fast_stdout" "$fast_stderr" | grep -q 'timed out'; then
+  echo "FAIL: a fast provider failure must not be reported as a timeout" >&2
+  exit 1
+fi
+if printf '%s\n' "$fast_stderr" | grep -q 'Killed'; then
+  echo "FAIL: watchdog kill must not leave a Killed line on stderr" >&2
+  printf '%s\n' "$fast_stderr" >&2
+  exit 1
+fi
+# A kill that hits only the subshell orphans `sleep 60` until the deadline.
+leftover="$(pgrep -f '(^|/)sleep 60$' || true)"
+if [ -n "$leftover" ]; then
+  echo "FAIL: watchdog sleep still running after a fast provider failure" >&2
+  printf '%s\n' "$leftover" >&2
+  printf '%s\n' "$leftover" | while IFS= read -r pid; do
+    kill -9 "$pid" 2>/dev/null || true
+  done
+  exit 1
+fi
+
 set +e
 output="$(run_cli "test failure propagation" 2>&1)"
 status=$?
