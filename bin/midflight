@@ -809,6 +809,9 @@ run_engine() {
         kill -9 -"$pg" 2>/dev/null || true
       ) >/dev/null 2>&1 &
       k=$!
+      # Disown the watchdog subshell so set -m does not emit a job-control
+      # "Killed: 9" line on stderr when we reap it after a fast provider exit.
+      disown "$k" 2>/dev/null || true
       # `|| true` would make $? the status of true, so a provider that
       # exits before the deadline (or is killed by it) would look like success.
       ec=0

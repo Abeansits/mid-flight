@@ -130,6 +130,11 @@ while [ "$fast_round" -lt 20 ]; do
   assert_eq "1" "$status" "provider failure under --timeout must exit 1 (round $fast_round)"
   assert_contains "$output" "provider exploded" "provider error should be visible (round $fast_round)"
   assert_contains "$output" "Codex query failed" "engine should report the provider failure (round $fast_round)"
+  if echo "$output" | grep -q 'Killed'; then
+    echo "FAIL: fast failure under --timeout must not emit watchdog Killed noise (round $fast_round)" >&2
+    echo "Output: $output" >&2
+    exit 1
+  fi
   if echo "$output" | grep -q 'timed out'; then
     echo "FAIL: a fast provider failure must not be reported as a timeout (round $fast_round)" >&2
     exit 1
@@ -159,6 +164,17 @@ exit 7
 STUB
   chmod +x "$TEST_DIR/bin/codex"
 done
+
+set +e
+output="$(run_cli --timeout 60 "fast failure under 60s timeout" 2>"$stderr_file")"
+status=$?
+set -e
+assert_eq "1" "$status" "fast provider failure under --timeout 60 must exit 1"
+if grep -q 'Killed' "$stderr_file"; then
+  echo "FAIL: --timeout 60 with fast failure left Killed noise on stderr" >&2
+  cat "$stderr_file" >&2
+  exit 1
+fi
 
 set +e
 output="$(run_cli "test failure propagation" 2>&1)"
