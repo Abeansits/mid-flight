@@ -28,12 +28,30 @@ provider_display_name() {
 provider_error_excerpt() {
   local log_file="$1"
   local excerpt=""
+  local line=""
+  local collapsed=""
 
   if [ ! -f "$log_file" ]; then
     return 0
   fi
 
-  excerpt="$(tail -n 3 "$log_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  # First line that states the failure. Markers keep this case: error:, Error, fatal.
+  # No match keeps the last three lines, collapsed onto one line.
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      *"error:"*|*"Error"*|*"fatal"*)
+        collapsed="$(printf '%s\n' "$line" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+        if [ -n "$collapsed" ]; then
+          excerpt="$collapsed"
+          break
+        fi
+        ;;
+    esac
+  done < "$log_file"
+
+  if [ -z "$excerpt" ]; then
+    excerpt="$(tail -n 3 "$log_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  fi
 
   if [ -n "$excerpt" ]; then
     printf ' Details: %s\n' "$excerpt"
@@ -88,7 +106,7 @@ classify_provider_failure() {
 
   # Socket-symlink warnings are matched on the whole log, before auth, so an
   # earlier "permission denied" cannot hide them. Auth, rate limit, and
-  # network use the same last-three-line window as Details.
+  # network still use the last three lines. Details may be an earlier error line.
   case "$normalized" in
     *"runtime-socket deny path"*"endpoint is a symlink"*|*"socket deny resolution failed"*"endpoint is a symlink"*|*"sandbox could not be applied"*"endpoint is a symlink"*)
       # Grok refuses --sandbox read-only when a runtime socket (Docker Desktop's
