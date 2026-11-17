@@ -120,6 +120,14 @@ set -e
 assert_eq "2" "$bad_status" "model+dual should exit 2"
 assert_contains "$bad" "--model cannot be combined with dual-consult" "model dual refusal"
 
+# Refuse --effort with dual
+set +e
+bad="$(run_cli --dual agy --effort high "x" 2>&1)"
+bad_status=$?
+set -e
+assert_eq "2" "$bad_status" "effort+dual should exit 2"
+assert_contains "$bad" "--effort cannot be combined with dual-consult" "effort dual refusal"
+
 # --dual with no argument: clear usage die (exit 2), not silent shift failure
 set +e
 bad="$(run_cli --dual 2>&1)"
