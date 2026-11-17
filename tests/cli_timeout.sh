@@ -165,16 +165,43 @@ STUB
   chmod +x "$TEST_DIR/bin/codex"
 done
 
+cat > "$TEST_DIR/bin/codex" <<'STUB'
+#!/bin/bash
+echo "provider exploded" >&2
+# Give the watchdog a moment to exec `sleep 60` so we actually verify it gets reaped.
+i=0
+while [ ! -f "$TEST_DIR/watchdog_sleep.pid" ] && [ "$i" -lt 40 ]; do
+  sleep 0.05 2>/dev/null || sleep 1
+  i=$((i + 1))
+done
+exit 7
+STUB
+chmod +x "$TEST_DIR/bin/codex"
+
+# Record the exact watchdog `sleep 60` PID via a PATH shim rather than pgrep
+# (pgrep fails in sandboxed macOS environments and can collide with unrelated sleeps).
+real_sleep="$(PATH="/usr/bin:/bin" command -v sleep)"
+cat > "$TEST_DIR/bin/sleep" <<STUB
+#!/bin/bash
+if [ "\${1:-}" = "60" ]; then
+  printf '%s\n' "\$\$" > "$TEST_DIR/watchdog_sleep.pid"
+fi
+exec "$real_sleep" "\$@"
+STUB
+chmod +x "$TEST_DIR/bin/sleep"
+
 set +e
 output="$(run_cli --timeout 60 "fast failure under 60s timeout" 2>"$stderr_file")"
 status=$?
 set -e
+rm -f "$TEST_DIR/bin/sleep"
 assert_eq "1" "$status" "fast provider failure under --timeout 60 must exit 1"
 if grep -q 'Killed' "$stderr_file"; then
   echo "FAIL: --timeout 60 with fast failure left Killed noise on stderr" >&2
   cat "$stderr_file" >&2
   exit 1
 fi
+assert_pid_gone "$TEST_DIR/watchdog_sleep.pid" "watchdog sleep 60"
 
 set +e
 output="$(run_cli "test failure propagation" 2>&1)"
