@@ -245,6 +245,7 @@ query_agy() {
   local output_file="$2"
   local include_dir="${3:-}"
   local args=(-p "$full_prompt" --output-format text)
+  local resolved_gemini_dir=""
 
   prepare_provider_run \
     "agy" \
@@ -265,6 +266,18 @@ query_agy() {
 
   if [ "${MODE:-}" = "implement" ]; then
     args+=(--dangerously-skip-permissions)
+  fi
+
+  # agy 1.5.10 has no home override. Sign-in lives under
+  # ~/.gemini/antigravity-cli (antigravity-oauth-token and the account model
+  # list). The temp config home symlinks ~/.gemini, and agy then lists only
+  # the default models. --gemini_dir points this process at the real directory.
+  # A real ~/.gemini is left alone.
+  if [ -n "${HOME:-}" ]; then
+    resolved_gemini_dir="$(resolve_real_home "$HOME/.gemini")"
+  fi
+  if [ -n "$resolved_gemini_dir" ]; then
+    args+=(--gemini_dir "$resolved_gemini_dir")
   fi
 
   agy "${args[@]}" \

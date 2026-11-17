@@ -235,7 +235,11 @@ the rest of your home directory through so provider CLIs keep their authenticati
 Your `~/.config/mid-flight/config` is never modified. When that temporary home's
 `~/.codex` is a symlink and `CODEX_HOME` is unset, the Codex process receives
 `CODEX_HOME` set to the real directory. A `CODEX_HOME` already set in the
-environment is passed through unchanged.
+environment is passed through unchanged. When `~/.gemini` inside that home is a
+symlink, the Antigravity process receives `--gemini_dir` set to the real
+directory. agy reads account sign-in from `<dir>/antigravity-cli` and has no
+home override; a symlinked `~/.gemini` drops models that only the signed-in
+account lists.
 
 `--model` maps to the appropriate config key based on the active provider:
 - `-p codex --model gpt-6-sol` → sets `codex_model`
