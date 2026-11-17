@@ -130,6 +130,14 @@ while [ "$i" -lt 300 ]; do
   pad="${pad}x"
   i=$((i + 1))
 done
+write_agy_failure "error:  two  spaces"
+run_failure
+assert_contains "$stdout" \
+  "Error: Antigravity query failed. Details: error: two spaces" \
+  "repeated spaces in the error line should collapse"
+assert_not_contains "$stdout" "error:  two" \
+  "repeated spaces should not survive into the stdout Error line"
+
 write_agy_failure "error: model rejected ${pad} ENDMARKER"
 run_failure
 assert_contains "$stdout" "Details: error: model rejected " \

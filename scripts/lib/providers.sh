@@ -52,7 +52,8 @@ provider_error_excerpt() {
 
   # Same collapse as the three-line tail, then that tail's one-line budget
   # (three 80-column lines). A matched line uses this cap too.
-  excerpt="$(printf '%s\n' "$picked" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  # -E: macOS sed does not treat \+ as "one or more".
+  excerpt="$(printf '%s\n' "$picked" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
   excerpt="${excerpt:0:240}"
 
   if [ -n "$excerpt" ]; then
