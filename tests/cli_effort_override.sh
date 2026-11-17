@@ -212,4 +212,45 @@ fi
 assert_eq "low" "$(cat "$TEST_DIR/grok_effort.txt")" \
   "video-gen should pass --effort to grok"
 
+echo "Test 10: a config with no provider= line does not abort --model or --effort"
+
+write_config <<'EOF'
+codex_model=old-model
+EOF
+
+cat > "$TEST_DIR/bin/codex" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+model=""
+effort_arg=""
+output_file=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model) model="$2"; shift 2 ;;
+    -c)
+      case "$2" in
+        model_reasoning_effort=*) effort_arg="$2" ;;
+      esac
+      shift 2
+      ;;
+    -o|--output-last-message) output_file="$2"; shift 2 ;;
+    --sandbox) shift 2 ;;
+    --skip-git-repo-check) shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "$model" > "$TEST_DIR/codex_model.txt"
+printf '%s' "$effort_arg" > "$TEST_DIR/codex_effort_arg.txt"
+printf 'probe-ok\n' > "$output_file"
+EOF
+chmod +x "$TEST_DIR/bin/codex"
+
+run_cli --model gpt-5 "test question" >/dev/null
+assert_eq "gpt-5" "$(cat "$TEST_DIR/codex_model.txt")" \
+  "--model with no provider= line should set the default codex model"
+
+run_cli --effort low "test question" >/dev/null
+assert_eq 'model_reasoning_effort="low"' "$(cat "$TEST_DIR/codex_effort_arg.txt")" \
+  "--effort with no provider= line should set the default codex effort"
+
 echo "PASS: --effort maps to the active provider's effort key"

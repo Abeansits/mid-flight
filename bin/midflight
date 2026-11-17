@@ -596,7 +596,9 @@ build_config_home() {
           ;;
       esac
     elif [ -z "$effective_provider" ]; then
-      effective_provider="$(grep '^provider=' "$config" | cut -d= -f2 | tr -d '[:space:]')"
+      # Same lookup as --effort. tail and || true: a config with no provider=
+      # line must not abort under pipefail (grep exits 1).
+      effective_provider="$(grep '^provider=' "$config" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
     fi
     [ -z "$effective_provider" ] && [ "$write_google_models" != "true" ] && effective_provider="codex"
 
@@ -649,7 +651,7 @@ build_config_home() {
   if [ -n "$EFFORT" ]; then
     local effort_provider="$PROVIDER"
     if [ -z "$effort_provider" ]; then
-      effort_provider="$(grep '^provider=' "$config" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)"
+      effort_provider="$(grep '^provider=' "$config" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
     fi
     [ -z "$effort_provider" ] && effort_provider="codex"
     case "$effort_provider" in
