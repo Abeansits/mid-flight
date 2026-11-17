@@ -344,6 +344,8 @@ Codex consult passes `--sandbox read-only`. Implement and image generation pass 
 
 When `~/.codex` is a symlink, MidFlight sets `CODEX_HOME` to that directory's real path for the Codex process. The temporary home from `-p`, `--model`, or `-c` symlinks `~/.codex`. Codex refuses writable roots such as `~/.codex/memories` when a path component is a symlink, and it skips creating helper binaries under that home. A `CODEX_HOME` already set in the environment is passed through unchanged. `allow_symlinked_codex_home = true` in `~/.codex/config.toml` is a user-global trust setting. MidFlight does not write that file.
 
+When `~/.gemini` is a symlink, MidFlight passes `--gemini_dir` set to that directory's real path for the Antigravity process only. The same temporary home symlinks `~/.gemini`. agy 1.5.10 reads account sign-in from `<dir>/antigravity-cli` and has no home override, so a symlinked `~/.gemini` lists only the default models. A real `~/.gemini` is left alone. MidFlight does not write that directory.
+
 Grok consult passes `--sandbox read-only`. That profile still writes `~/.grok` and temp directories. An enterprise `requirements.toml` pin can override the CLI flag. Implement, image generation, and video generation pass `--always-approve` and leave the sandbox off so those modes can write.
 
 Claude consult passes `--permission-mode plan`. Claude Code documents plan mode as reading and exploring without editing source. Shell commands can still run, and accepting a plan leaves plan mode. This is not a kernel sandbox. Implement passes `--dangerously-skip-permissions` and does not pass plan mode.

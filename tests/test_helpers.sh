@@ -118,6 +118,7 @@ prompt=""
 model=""
 effort=""
 add_dir=""
+gemini_dir=""
 skip_permissions="no"
 output_format=""
 unknown=""
@@ -128,6 +129,7 @@ while [ \$# -gt 0 ]; do
     --effort) effort="\$2"; shift 2 ;;
     --add-dir) add_dir="\$2"; shift 2 ;;
     --output-format) output_format="\$2"; shift 2 ;;
+    --gemini_dir) gemini_dir="\$2"; shift 2 ;;
     --dangerously-skip-permissions) skip_permissions="yes"; shift ;;
     *) unknown="\${unknown}\${unknown:+ }\$1"; shift ;;
   esac
@@ -139,6 +141,13 @@ printf '%s' "\$add_dir" > "$TEST_DIR/agy_add_dir.txt"
 printf '%s' "\$output_format" > "$TEST_DIR/agy_output_format.txt"
 printf '%s' "\$skip_permissions" > "$TEST_DIR/agy_skip_permissions.txt"
 printf '%s' "\$unknown" > "$TEST_DIR/agy_unknown_args.txt"
+printf '%s' "\$gemini_dir" > "$TEST_DIR/agy_gemini_dir.txt"
+printf '%s' "\$HOME" > "$TEST_DIR/agy_process_home.txt"
+if [ -L "\$HOME/.gemini" ]; then
+  printf '%s' "symlink" > "$TEST_DIR/agy_gemini_link.txt"
+else
+  printf '%s' "other" > "$TEST_DIR/agy_gemini_link.txt"
+fi
 printf '%s\n' "$response"
 EOF
   chmod +x "$TEST_DIR/bin/agy"
