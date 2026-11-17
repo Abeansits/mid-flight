@@ -20,7 +20,7 @@ AGY_INSTALL_URL="https://antigravity.google/docs/cli/install"
 GEMINI_INSTALL_URL="https://github.com/google-gemini/gemini-cli"
 
 config_file_path() {
-  printf '%s\n' "${HOME}/.config/mid-flight/config"
+  printf '%s\n' "${MIDFLIGHT_CONFIG:-${HOME}/.config/mid-flight/config}"
 }
 
 reset_config_validation_issues() {
@@ -58,7 +58,7 @@ config_value() {
   local key="$1"
   local config_file="$2"
 
-  grep "^${key}=" "$config_file" | cut -d= -f2- | tr -d '[:space:]' || true
+  grep "^${key}=" "$config_file" | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true
 }
 
 load_config() {

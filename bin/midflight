@@ -488,11 +488,12 @@ resolve_dual_providers() {
       PRIMARY_PROVIDER="$(normalize_provider_name "$PROVIDER")"
       require_known_provider "$PRIMARY_PROVIDER" "-p/--provider"
     else
+      local default_cfg="${MIDFLIGHT_CONFIG:-$HOME/.config/mid-flight/config}"
       if [ -n "$CONFIG_FILE" ]; then
         [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
-        cfg_provider="$(grep '^provider=' "$CONFIG_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
-      elif [ -f "$HOME/.config/mid-flight/config" ]; then
-        cfg_provider="$(grep '^provider=' "$HOME/.config/mid-flight/config" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+        cfg_provider="$(grep '^provider=' "$CONFIG_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+      elif [ -f "$default_cfg" ]; then
+        cfg_provider="$(grep '^provider=' "$default_cfg" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
       fi
       if [ -n "$cfg_provider" ]; then
         PRIMARY_PROVIDER="$(normalize_provider_name "$cfg_provider")"
@@ -528,42 +529,19 @@ cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
 
-# Symlink each entry of src into dest, skipping one name. Lets the temp config
-# home mirror the real home so passthrough still resolves there.
-# -f: dual-consult calls build_config_home once per side; replace existing links.
-# -n: if dest is a symlink, replace it rather than following into a directory.
-mirror_dir() {
-  local src="$1" dest="$2" skip="$3" entry base
-  [ -d "$src" ] || return 0
-  for entry in "$src"/* "$src"/.[!.]*; do
-    [ -e "$entry" ] || continue
-    base="${entry##*/}"
-    [ "$base" = "$skip" ] && continue
-    ln -sfn "$entry" "$dest/$base"
-  done
-}
+# Stage a temporary config file so -p/--model/-c can override config without
+# swapping $HOME or touching the user's real config. Keeping the real $HOME
+# lets provider CLIs (codex, grok, agy, ...) read their own auth and account
+# state directly. Dual-consult calls this once per side into the same WORKDIR.
+build_staged_config() {
+  local config="$WORKDIR/config"
+  local base_config="${MIDFLIGHT_CONFIG:-$HOME/.config/mid-flight/config}"
 
-# Build a temporary config home so -p/-c can override config without touching
-# the engine or the user's real config. The engine only reads $HOME for the
-# config file, but provider CLIs read $HOME for their own auth, so the real
-# home's contents are symlinked through; only the mid-flight config is replaced.
-#
-# Dual-consult invokes this twice (once per provider) into the same WORKDIR.
-# Wipe first so a populated real HOME does not make the second `ln` fail with
-# "File exists".
-build_config_home() {
-  local home_dir="$WORKDIR/home"
-  rm -rf "$home_dir"
-  mkdir -p "$home_dir/.config/mid-flight"
-  mirror_dir "$HOME" "$home_dir" ".config"
-  mirror_dir "$HOME/.config" "$home_dir/.config" "mid-flight"
-
-  local config="$home_dir/.config/mid-flight/config"
   if [ -n "$CONFIG_FILE" ]; then
     [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
     cp "$CONFIG_FILE" "$config"
-  elif [ -f "$HOME/.config/mid-flight/config" ]; then
-    cp "$HOME/.config/mid-flight/config" "$config"
+  elif [ -f "$base_config" ]; then
+    cp "$base_config" "$config"
   else
     : > "$config"
   fi
@@ -589,7 +567,7 @@ build_config_home() {
           ;;
       esac
     elif [ -z "$effective_provider" ]; then
-      effective_provider="$(grep '^provider=' "$config" | cut -d= -f2 | tr -d '[:space:]')"
+      effective_provider="$(grep '^provider=' "$config" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
     fi
     [ -z "$effective_provider" ] && [ "$write_google_models" != "true" ] && effective_provider="codex"
 
@@ -639,7 +617,7 @@ build_config_home() {
     fi
   fi
 
-  CONFIG_HOME="$home_dir"
+  STAGED_CONFIG="$config"
 }
 
 # Cap a blob to GIT_CONTEXT_MAX_BYTES and print it. On truncation, append a
@@ -927,14 +905,14 @@ if [ "$want_dual" -eq 1 ]; then
 
   # Primary
   PROVIDER="$PRIMARY_PROVIDER"
-  CONFIG_HOME=""
-  build_config_home
-  run_engine_capture "$out_a" "$err_a" "$ec_a_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  STAGED_CONFIG=""
+  build_staged_config
+  run_engine_capture "$out_a" "$err_a" "$ec_a_file" env MIDFLIGHT_CONFIG="$STAGED_CONFIG" bash "$QUERY_SH" "${engine_args[@]}"
   # Secondary
   PROVIDER="$SECONDARY_PROVIDER"
-  CONFIG_HOME=""
-  build_config_home
-  run_engine_capture "$out_b" "$err_b" "$ec_b_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  STAGED_CONFIG=""
+  build_staged_config
+  run_engine_capture "$out_b" "$err_b" "$ec_b_file" env MIDFLIGHT_CONFIG="$STAGED_CONFIG" bash "$QUERY_SH" "${engine_args[@]}"
 
   # Keep provider logs on stderr (prefixed) so dual stdout stays the product.
   if [ -s "$err_a" ]; then
@@ -969,9 +947,9 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   sleep 1
   set +e
   if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
-    CONFIG_HOME=""
-    build_config_home
-    HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
+    STAGED_CONFIG=""
+    build_staged_config
+    MIDFLIGHT_CONFIG="$STAGED_CONFIG" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   else
     run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   fi
@@ -1002,9 +980,9 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
 fi
 
 if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
-  CONFIG_HOME=""
-  build_config_home
-  HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"
+  STAGED_CONFIG=""
+  build_staged_config
+  MIDFLIGHT_CONFIG="$STAGED_CONFIG" run_engine bash "$QUERY_SH" "${engine_args[@]}"
   ec=$?
 else
   run_engine bash "$QUERY_SH" "${engine_args[@]}"

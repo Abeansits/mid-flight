@@ -230,12 +230,12 @@ midflight -f query.md
 
 `-p/--provider`, `--model`, and `-c/--config` let you change the provider, model,
 or config for a single call without editing your real config. The CLI composes
-an effective config in a temporary home and points the engine at it, while symlinking
-the rest of your home directory through so provider CLIs keep their authentication.
-Your `~/.config/mid-flight/config` is never modified. When that temporary home's
-`~/.codex` is a symlink and `CODEX_HOME` is unset, the Codex process receives
-`CODEX_HOME` set to the real directory. A `CODEX_HOME` already set in the
-environment is passed through unchanged.
+an effective config file in a temporary directory and passes it to the engine
+via `MIDFLIGHT_CONFIG`, leaving `$HOME` and your `~/.config/mid-flight/config`
+untouched so provider CLIs keep their real home, auth, and account state. When
+`~/.codex` is itself a symlink and `CODEX_HOME` is unset, the Codex process
+receives `CODEX_HOME` set to the real directory. A `CODEX_HOME` already set in
+the environment is passed through unchanged.
 
 `--model` maps to the appropriate config key based on the active provider:
 - `-p codex --model gpt-6-sol` → sets `codex_model`
