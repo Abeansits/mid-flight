@@ -36,4 +36,4 @@ Do not invent config problems. Report what the script says.
 
 ## Note on Grok Build hosts
 
-There is no `provider=grok` yet, so the default `provider=codex` (or whichever CLI you configured) is the expected external consult target. Confirm that provider's CLI is on `PATH` and authenticated.
+If the active provider is `grok` (or `grok-build`), mention that `/midflight` will auto-prefer a non-Grok provider unless `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` is set — so having an alternate CLI (`codex`, `agy`, `opencode`, `oz`, `gemini`, or `claude`) on `PATH` is recommended.

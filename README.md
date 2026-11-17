@@ -389,7 +389,7 @@ claude_model=
 |---|---|---|
 | `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude` |
 | `codex_model` | `gpt-6-sol` | Codex model |
-| `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
+| `codex_reasoning_effort` | `high` | `low`, `medium`, `high`, `xhigh` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
 | `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
 | `gemini_model` | `gemini-3.1-pro-preview` | Gemini Pro. Flash is `gemini-3.8-flash` |
@@ -495,7 +495,7 @@ On macOS, `shasum -a 256 /tmp/midflight.tar.gz` prints the same digest.
 
 `publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch.
 
-`Formula/midflight.rb` currently installs `v1.18.0`. `brew upgrade` stays on that tag until the formula change for a newer tag is on `main`.
+`Formula/midflight.rb` currently installs `v1.19.2`. `brew upgrade` stays on that tag until the formula change for a newer tag is on `main`.
 
 #### Release smoke check
 

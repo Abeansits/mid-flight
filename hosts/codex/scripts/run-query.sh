@@ -46,7 +46,7 @@ fi
 resolve_args=()
 [ -n "$START_DIR" ] && resolve_args+=(--start-dir "$START_DIR")
 # Preserve paths that contain spaces (kind is a single token; path is the rest).
-resolved_line="$(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}")"
+resolved_line="$(bash "$SCRIPT_DIR/resolve-engine.sh" ${resolve_args[@]+"${resolve_args[@]}"})"
 kind="${resolved_line%% *}"
 engine="${resolved_line#* }"
 
