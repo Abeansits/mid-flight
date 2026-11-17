@@ -815,6 +815,11 @@ run_engine() {
       wait "$pg" 2>/dev/null || ec=$?
       timed_out=0
       [ -f "$flag" ] && timed_out=1
+      # set -m makes the watchdog a job, so SIGKILL prints "Killed" on
+      # stderr. A later `wait 2>/dev/null` does not hide it: bash issues
+      # the notice before that redirection. disown leaves the process
+      # running; the kills below still reap the subshell and its sleep.
+      disown "$k" 2>/dev/null || true
       # Pid first. A group kill can succeed by hitting only sleep.
       kill -9 "$k" 2>/dev/null || true
       kill -9 -"$k" 2>/dev/null || true
