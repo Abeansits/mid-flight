@@ -194,4 +194,55 @@ EOF
     "stdout Error should surface '$marker_line'"
 done
 
+# All-caps ERROR: is not one of the case-sensitive markers and keeps the tail.
+cat > "$TEST_DIR/bin/agy" <<'EOF'
+#!/bin/bash
+printf '%s\n' 'ERROR: uppercase should not match' >&2
+printf '%s\n' 'tail alpha' >&2
+printf '%s\n' 'tail beta' >&2
+printf '%s\n' 'tail gamma' >&2
+exit 1
+EOF
+chmod +x "$TEST_DIR/bin/agy"
+
+set +e
+stdout_only="$(run_query "$QUERY_FILE" consult 2>/dev/null)"
+status=$?
+set -e
+
+assert_eq "1" "$status" "uppercase ERROR failure should exit 1"
+assert_contains "$stdout_only" "Details: tail alpha tail beta tail gamma" \
+  "uppercase ERROR: should fall back to the log tail"
+assert_not_contains "$stdout_only" "uppercase should not match" \
+  "uppercase ERROR: should not replace the log tail"
+
+# Over-long matched line is capped at 240 characters.
+pad=""
+i=0
+while [ "$i" -lt 260 ]; do
+  pad="${pad}x"
+  i=$((i + 1))
+done
+printf 'error: long reason %s ENDMARKER\n' "$pad" > "$TEST_DIR/long_error.txt"
+cat > "$TEST_DIR/bin/agy" <<EOF
+#!/bin/bash
+cat "$TEST_DIR/long_error.txt" >&2
+exit 1
+EOF
+chmod +x "$TEST_DIR/bin/agy"
+
+set +e
+stdout_only="$(run_query "$QUERY_FILE" consult 2>/dev/null)"
+status=$?
+set -e
+
+assert_eq "1" "$status" "over-long error failure should exit 1"
+assert_contains "$stdout_only" "Details: error: long reason " \
+  "over-long error line should preserve the beginning of the reason"
+assert_not_contains "$stdout_only" "ENDMARKER" \
+  "over-long error line should be truncated at 240 characters"
+detail="${stdout_only#*Details: }"
+detail="${detail%%$'\n'*}"
+assert_eq "240" "${#detail}" "over-long Details excerpt should stop at 240 characters"
+
 echo "PASS: unrecognized provider failures keep the excerpt and skip install/login"
