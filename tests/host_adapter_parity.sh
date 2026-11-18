@@ -34,6 +34,30 @@ assert_same_exact() {
   fi
 }
 
+extract_range() {
+  local start_re="$1"
+  local end_re="$2"
+  local file="$3"
+  awk -v s="$start_re" -v e="$end_re" '$0 ~ s { show=1 } show { print } show && $0 ~ e { exit }' "$file"
+}
+
+assert_same_range() {
+  local start_re="$1"
+  local end_re="$2"
+  local file_a="$3"
+  local file_b="$4"
+  local label="$5"
+  local a b
+
+  a="$(extract_range "$start_re" "$end_re" "$file_a")"
+  b="$(extract_range "$start_re" "$end_re" "$file_b")"
+  if [ -z "$a" ] || [ -z "$b" ] || [ "$a" != "$b" ]; then
+    echo "FAIL: $label diverged between $file_a and $file_b" >&2
+    diff -u <(printf '%s\n' "$a") <(printf '%s\n' "$b") >&2 || true
+    exit 1
+  fi
+}
+
 # 1. Shared host adapter scripts must stay in lockstep across codex, cursor, and grok.
 for host in cursor grok; do
   assert_same_ignoring_line2 \
@@ -50,6 +74,22 @@ for host in cursor grok; do
     "$ROOT_DIR/hosts/codex/skills/midflight-check-config/scripts/run.sh" \
     "$ROOT_DIR/hosts/$host/skills/midflight-check-config/scripts/run.sh" \
     "midflight-check-config/scripts/run.sh ($host vs codex)"
+
+  # run-query.sh differs by host circular-provider policy, so check its shared
+  # engine-resolution and CLI mode-dispatch blocks rather than whole-file parity.
+  assert_same_range \
+    '^resolve_args=\(\)' \
+    '^engine=' \
+    "$ROOT_DIR/hosts/codex/scripts/run-query.sh" \
+    "$ROOT_DIR/hosts/$host/scripts/run-query.sh" \
+    "run-query.sh engine resolution ($host vs codex)"
+
+  assert_same_range \
+    '^    mode=' \
+    '^    exec bash ' \
+    "$ROOT_DIR/hosts/codex/scripts/run-query.sh" \
+    "$ROOT_DIR/hosts/$host/scripts/run-query.sh" \
+    "run-query.sh cli dispatch ($host vs codex)"
 done
 
 assert_same_exact \
