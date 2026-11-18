@@ -51,6 +51,12 @@ assert_pid_gone() {
     exit 1
   }
   pid="$(cat "$pid_file")"
+  case "$pid" in
+    ''|*[!0-9]*)
+      echo "FAIL: $label recorded invalid pid '$pid'" >&2
+      exit 1
+      ;;
+  esac
   if kill -0 "$pid" 2>/dev/null; then
     echo "FAIL: $label pid $pid still running after timeout" >&2
     exit 1
@@ -184,7 +190,8 @@ real_sleep="$(PATH="/usr/bin:/bin" command -v sleep)"
 cat > "$TEST_DIR/bin/sleep" <<STUB
 #!/bin/bash
 if [ "\${1:-}" = "60" ]; then
-  printf '%s\n' "\$\$" > "$TEST_DIR/watchdog_sleep.pid"
+  printf '%s\n' "\$\$" > "$TEST_DIR/watchdog_sleep.pid.tmp"
+  mv "$TEST_DIR/watchdog_sleep.pid.tmp" "$TEST_DIR/watchdog_sleep.pid"
 fi
 exec "$real_sleep" "\$@"
 STUB
