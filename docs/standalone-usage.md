@@ -68,6 +68,7 @@ midflight --video-gen PROMPT
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
+      --effort LEVEL     reasoning effort for codex, agy, or grok (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
@@ -119,7 +120,7 @@ Rules:
 - Stdout is a labeled dump (`## Provider A` / `## Provider B`) plus a short `## Where they differ` note that is structural only (identical-after-trim, or “compare them yourself”). MidFlight does **not** invent a merged opinion or LLM disagreement analysis.
 - If one provider fails, the successful answer is still printed and the failed side shows its error; exit status is `1`.
 - `--timeout` applies per side (~2N wall-clock for dual). A side that hits the bound shows `Error: timed out after Ns waiting for provider response` in its section.
-- `--model` is not combined with dual (set per-provider models in config). `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
+- `--model` is not combined with dual (set per-provider models in config). `--effort` is also single-provider only. `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
 
 ### Git-derived context
 
@@ -228,8 +229,8 @@ midflight -f query.md
 
 ## Provider and config overrides
 
-`-p/--provider`, `--model`, and `-c/--config` let you change the provider, model,
-or config for a single call without editing your real config. The CLI composes
+`-p/--provider`, `--model`, `--effort`, and `-c/--config` let you change the provider,
+model, effort, or config for a single call without editing your real config. The CLI composes
 an effective config in a temporary home and points the engine at it, while symlinking
 the rest of your home directory through so provider CLIs keep their authentication.
 Your `~/.config/mid-flight/config` is never modified. When that temporary home's
@@ -247,6 +248,13 @@ environment is passed through unchanged.
   `gemini_model`. A configured `agy` or `gemini` stays; otherwise video prefers
   `agy` on `PATH`, else Gemini
 
+`--effort` maps to the active provider's effort key when it has one:
+- `-p codex --effort xhigh` → sets `codex_reasoning_effort`
+- `-p agy --effort high` → sets `agy_effort`
+- `-p grok --effort medium` → sets `grok_effort`
+- Providers without an effort setting (`gemini`, `opencode`, `oz`, `claude`) and
+  dual-consult (`--dual`, `--providers`) exit `2` with a `midflight:` error on stderr.
+
 ## Exit codes
 
 - `0` — success. The provider reply is on stdout. `[mid-flight]` logs are on
@@ -255,7 +263,7 @@ environment is passed through unchanged.
   That covers a bad mode, a missing question, conflicting flags, missing files
   passed to `--context` / `--config` / `--query-file`, dual-consult misuse
   (implement, video, image-gen, video-gen, the same provider twice,
-  `--dual` with `--providers`, `--model` with dual, an unknown dual name),
+  `--dual` with `--providers`, `--model` or `--effort` with dual, `--effort` with a provider that has no effort setting, an unknown dual name),
   `--git-status` / `--diff` outside a git work tree or without `git` on `PATH`,
   a readable PNG or JPEG opening frame that conflicts with `--aspect`, and an
   `-p` value `--image-gen` or `--video-gen` rejects.
