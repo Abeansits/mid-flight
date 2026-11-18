@@ -649,7 +649,6 @@ build_config_home() {
 
     if [ -n "$EFFORT" ]; then
       local effort_provider="$effective_provider"
-      local write_image_efforts="false"
 
       if [ "$MODE" = "video" ]; then
         case "$effort_provider" in
@@ -665,26 +664,29 @@ build_config_home() {
       elif [ "$MODE" = "image-gen" ]; then
         case "$effort_provider" in
           codex|grok|grok-build) ;;
-          *) write_image_efforts="true" ;;
+          *)
+            if command -v grok >/dev/null 2>&1; then
+              effort_provider="grok"
+            elif command -v codex >/dev/null 2>&1; then
+              effort_provider="codex"
+            else
+              effort_provider="grok"
+            fi
+            ;;
         esac
       elif [ "$MODE" = "video-gen" ]; then
         effort_provider="grok"
       fi
 
-      if [ "$write_image_efforts" = "true" ]; then
-        write_config_key "grok_effort" "$EFFORT"
-        write_config_key "codex_reasoning_effort" "$EFFORT"
-      else
-        local effort_key=""
-        case "$effort_provider" in
-          codex)                         effort_key="codex_reasoning_effort" ;;
-          agy|antigravity)               effort_key="agy_effort" ;;
-          grok|grok-build)               effort_key="grok_effort" ;;
-          gemini|opencode|oz|claude)     die "--effort is not supported for provider '$effort_provider' (supported: codex, agy, grok)" ;;
-          *)                             die "unknown provider '$effort_provider' for --effort mapping" ;;
-        esac
-        write_config_key "$effort_key" "$EFFORT"
-      fi
+      local effort_key=""
+      case "$effort_provider" in
+        codex)                         effort_key="codex_reasoning_effort" ;;
+        agy|antigravity)               effort_key="agy_effort" ;;
+        grok|grok-build)               effort_key="grok_effort" ;;
+        gemini|opencode|oz|claude)     die "--effort is not supported for provider '$effort_provider' (supported: codex, agy, grok)" ;;
+        *)                             die "unknown provider '$effort_provider' for --effort mapping" ;;
+      esac
+      write_config_key "$effort_key" "$EFFORT"
     fi
   fi
 

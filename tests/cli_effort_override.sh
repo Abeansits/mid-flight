@@ -158,6 +158,37 @@ fi
 assert_eq "high" "$(cat "$TEST_DIR/grok_effort.txt")" \
   "image-gen should pass --effort to grok fallback"
 
+# When grok is absent and codex is present, image-gen falls back to codex and
+# must not write grok_effort=xhigh (which fails config validation).
+rm -f "$TEST_DIR/bin/grok" "$TEST_DIR/codex_reasoning.txt"
+cat > "$TEST_DIR/bin/codex" <<EOF
+#!/bin/bash
+set -euo pipefail
+output_file=""
+reasoning=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o|--output-last-message) output_file="\$2"; shift 2 ;;
+    -c) reasoning="\$2"; shift 2 ;;
+    --model|--sandbox|-i|--image) shift 2 ;;
+    --skip-git-repo-check) shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s' "\$reasoning" > "$TEST_DIR/codex_reasoning.txt"
+touch "$plane"
+printf '%s\n' "$plane" > "\$output_file"
+EOF
+chmod +x "$TEST_DIR/bin/codex"
+output="$(run_cli --image-gen "a paper plane over a fjord" --effort xhigh)"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$plane" ]; then
+  echo "FAIL: image-gen --effort xhigh should print the saved codex image path" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+assert_eq 'model_reasoning_effort="xhigh"' "$(cat "$TEST_DIR/codex_reasoning.txt")" \
+  "image-gen codex fallback should receive model_reasoning_effort=\"xhigh\""
+
 write_config <<'CFG'
 provider=codex
 codex_model=test-codex
