@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types $midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types $midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 ---
 
 # MidFlight — Mid-Development Consultation (Codex host)
