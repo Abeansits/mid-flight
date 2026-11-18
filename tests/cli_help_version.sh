@@ -10,6 +10,8 @@ trap cleanup_test_env EXIT
 help_output="$(run_cli --help)"
 assert_contains "$help_output" "Usage:" "--help should print usage"
 assert_contains "$help_output" "--provider" "--help should list the provider flag"
+effort_help="$(printf '%s\n' "$help_output" | grep -- '--effort LEVEL' || true)"
+assert_contains "$effort_help" "not with dual" "--help should say --effort is not combined with dual"
 assert_contains "$help_output" "--video" "--help should list the video flag"
 assert_contains "$help_output" "--image-gen" "--help should list --image-gen"
 assert_contains "$help_output" "--video-gen" "--help should list --video-gen"

@@ -100,4 +100,78 @@ assert_eq "2" "$status" "--dual with --effort should exit 2"
 assert_eq "" "$(cat "$stdout_file")" "--dual with --effort should print empty stdout"
 assert_contains "$(cat "$stderr_file")" "midflight:" "--dual with --effort should print midflight: on stderr"
 
+set +e
+run_cli --providers codex,agy --effort high "Providers with effort" >"$stdout_file" 2>"$stderr_file"
+status=$?
+set -e
+assert_eq "2" "$status" "--providers with --effort should exit 2"
+assert_eq "" "$(cat "$stdout_file")" "--providers with --effort should print empty stdout"
+assert_contains "$(cat "$stderr_file")" "midflight:" "--providers with --effort should print midflight: on stderr"
+
+# 8. Default codex provider (empty config) accepts --effort xhigh.
+: > "$HOME/.config/mid-flight/config"
+rm -f "$TEST_DIR/codex_reasoning.txt"
+out="$(run_cli --effort xhigh "Default codex xhigh")"
+assert_eq "codex-effort-ok" "$out" "--effort xhigh on default codex should succeed"
+assert_eq 'model_reasoning_effort="xhigh"' "$(cat "$TEST_DIR/codex_reasoning.txt")" \
+  "default codex should receive model_reasoning_effort=\"xhigh\""
+
+# 9. Video mode follows the Google provider that runs (agy if on PATH, else gemini -> exit 2).
+write_config <<'CFG'
+provider=codex
+codex_model=test-model
+CFG
+printf 'fake-video-bytes\n' > "$TEST_DIR/clip.mp4"
+rm -f "$TEST_DIR/agy_effort.txt"
+run_cli --video "$TEST_DIR/clip.mp4" --effort high "describe this" >/dev/null
+assert_eq "high" "$(cat "$TEST_DIR/agy_effort.txt")" \
+  "video mode should pass --effort to agy when agy is on PATH"
+
+rm -f "$TEST_DIR/bin/agy" "$TEST_DIR/gemini_prompt.txt"
+write_gemini_stub "should-not-run"
+set +e
+run_cli --video "$TEST_DIR/clip.mp4" --effort high "describe this" >"$stdout_file" 2>"$stderr_file"
+status=$?
+set -e
+assert_eq "2" "$status" "video --effort without agy (falls back to gemini) should exit 2"
+assert_eq "" "$(cat "$stdout_file")" "video gemini --effort should print empty stdout"
+assert_contains "$(cat "$stderr_file")" "midflight:" "video gemini --effort should print midflight: on stderr"
+if [ -f "$TEST_DIR/gemini_prompt.txt" ]; then
+  echo "FAIL: video --effort should not call gemini" >&2
+  exit 1
+fi
+
+# 10. image-gen and video-gen follow the provider that runs.
+write_config <<'CFG'
+provider=agy
+agy_model=test-agy
+CFG
+plane="$TEST_DIR/paper-plane.png"
+printf 'png\n' > "$plane"
+write_grok_stub "$plane"
+output="$(run_cli --image-gen "a paper plane over a fjord" --effort high)"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$plane" ]; then
+  echo "FAIL: image-gen --effort should print the saved grok image path" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+assert_eq "high" "$(cat "$TEST_DIR/grok_effort.txt")" \
+  "image-gen should pass --effort to grok fallback"
+
+write_config <<'CFG'
+provider=codex
+codex_model=test-codex
+CFG
+clip="$TEST_DIR/gen-clip.mp4"
+printf 'mp4\n' > "$clip"
+write_grok_stub "$clip"
+output="$(run_cli --effort low --video-gen "the paper plane banks once")"
+if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
+  echo "FAIL: video-gen --effort should print the saved grok video path" >&2
+  echo "Actual: $output" >&2
+  exit 1
+fi
+assert_eq "low" "$(cat "$TEST_DIR/grok_effort.txt")" \
+  "video-gen should pass --effort to grok"
+
 echo "PASS: --effort maps to provider effort keys and rejects unsupported providers/dual"
