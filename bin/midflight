@@ -69,7 +69,9 @@ Calling contract:
   -p on --image-gen must be codex or grok. -p on --video-gen must be grok.
           Aliases: antigravity → agy, grok-build → grok.
   --video keeps agy or gemini (config or -p). Any other provider prefers
-          agy on PATH, else Gemini. --image-gen keeps grok or codex; any
+          agy on PATH, else Gemini. A URL is downloaded with yt-dlp first.
+          Files over the provider limit (agy 100MB, Gemini 20MB) are shrunk
+          with ffmpeg when it is installed. --image-gen keeps grok or codex; any
           other uses grok on PATH, else Codex on PATH, else grok.
           --video-gen keeps grok; any other provider is overridden to grok.
   Unknown --dual or --providers names exit 2. Unknown -p on one consult

@@ -170,7 +170,8 @@ midflight -m implement -f request.md
 
 # Video analysis (keeps agy or gemini; otherwise agy on PATH, else Gemini)
 midflight --video ./ad-v3.mp4 "does this match the storyboard we discussed?"
-midflight --video https://youtube.com/watch?v=abc123
+# A link is downloaded with yt-dlp first, then analyzed as a file
+midflight --video "https://www.youtube.com/watch?v=abc123" "what is the hook in the first 5 seconds?"
 
 # Image generation (Grok or Codex; prints the saved file path)
 midflight --image-gen "a paper plane over a fjord"
@@ -195,7 +196,12 @@ midflight -f query.md
 - **`--video FILE|URL`** — forces video mode. A configured or `-p` provider of
   `agy` or `gemini` stays. Any other provider prefers `agy` on `PATH`, else
   Gemini. Trailing text is the prompt; with no prompt the engine uses its
-  default scene-breakdown prompt.
+  default scene-breakdown prompt. A link is downloaded with `yt-dlp` (capped
+  at 720p, `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes that) and analyzed as a file;
+  the providers do not watch a bare link. `agy` reads files up to 100MB and
+  Gemini up to 20MB. A larger file, or a format the provider does not read, is
+  re-encoded with `ffmpeg` when it is installed. `MIDFLIGHT_VIDEO_MAX_MB`
+  overrides the size limit.
 - **Stdin** — ignored. `echo question | midflight` exits 2 (`midflight: …` on
   stderr, empty stdout). Pass the question as arguments. `--` ends options, so
   a question that starts with `-` is `midflight -- -question`.

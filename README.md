@@ -64,7 +64,7 @@ That outside take sits next to your current agent's analysis. You stay in the se
 | 🧠 | **Second opinion.** Another model answers. Codex and Grok block project writes. Other providers follow their own permission settings. | `midflight "SSE or WebSockets?"` |
 | 🛠️ | **One precise change.** Hand it a spec. It edits that and stops. | `midflight -m implement -f request.md` |
 | 👀 | **Two models, one question.** Both answers, side by side. | `midflight --dual agy "SSE or WebSockets?"` |
-| 🎬 | **Watch a video.** A local file or a URL, via Antigravity or Gemini. | `midflight --video ./ad.mp4 "does this match the storyboard?"` |
+| 🎬 | **Watch a video.** A local file or a link, via Antigravity or Gemini. Links are downloaded with `yt-dlp`. | `midflight --video ./ad.mp4 "does this match the storyboard?"` |
 | 🖼️ | **Make an image.** Grok or Codex. Prints the saved file path. | `midflight --image-gen "a paper plane over a fjord"` |
 | 🎥 | **Make a video.** Grok only. Prints the saved file path. | `midflight --video-gen "the paper plane banks once and levels out"` |
 | 📎 | **Bring the repo.** Notes, source files, branch, and diff ride along. | `midflight --git-status --diff "does this look right?"` |
@@ -163,6 +163,7 @@ midflight --context notes.md --include "src/*.ts" "where is the leak?"
 midflight --git-status --diff "does this change look right?"
 midflight -m implement -f request.md
 midflight --video ./ad-v3.mp4 "does this match the storyboard?"
+midflight --video "https://www.youtube.com/watch?v=abc123" "what is the hook in the first 5 seconds?"
 midflight --image-gen "a paper plane over a fjord"
 midflight --video-gen "the paper plane banks once and levels out"
 ```
@@ -334,6 +335,18 @@ From Claude Code, prefer a non-`claude` provider — `provider=claude` is circul
 
 Video analysis uses your configured Google provider if it is `agy` or `gemini`. Otherwise it picks **agy if it's on `PATH`**, else Gemini.
 
+The provider watches a file, never a link. Both CLIs answer a bare link from web search or page text, and the answer can be wrong. MidFlight downloads a link first and sends the file.
+
+| | Antigravity (`agy`) | Gemini |
+|---|---|---|
+| Largest file | 100MB | 20MB |
+| Read as-is | MP4, M4V, MOV, WebM, AVI, MKV | MP4, M4V, MOV, WebM, AVI, MPEG, FLV, WMV, 3GP |
+
+- **Links** need [`yt-dlp`](https://github.com/yt-dlp/yt-dlp#installation) (`brew install yt-dlp`). It works for YouTube and most video sites. The download is capped at 720p. `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes the cap. Without `yt-dlp`, only a direct link to a media file works, through `curl`. Live streams are refused.
+- **Oversized or unusual files** need `ffmpeg` and `ffprobe` (`brew install ffmpeg`). MidFlight re-encodes the staged copy to fit the provider limit. Your file is not touched. It lowers resolution and frame rate before it gives up. Without `ffmpeg`, an oversized file is an error and an unusual format is sent as it is.
+- **Length.** `agy` read a 20-minute clip at one frame per second in testing. A video too long to fit the size limit at a watchable quality is an error. That is about 2 hours on `agy` and about 25 minutes on Gemini.
+- `MIDFLIGHT_VIDEO_MAX_MB` overrides the size limit for both providers.
+
 Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any other config is overridden to Grok. `-p` must be `grok`. The prompt asks for 720p when `image_to_video` lists `resolution_name`. The saved file can be smaller. The first `--ref` is the opening frame and sets the shape. A readable PNG or JPEG that conflicts with `--aspect` exits 2. An unreadable frame warns on stderr and continues.
 
 ### Consult and file writes
@@ -436,7 +449,10 @@ Validate setup first: `/midflight-check-config` (Claude / Grok Build / Cursor), 
 | `Claude query failed` | Auth or provider error | `claude --version`; confirm Claude Code login |
 | `Empty response` | Provider returned nothing | Retry, or switch `provider=` in config |
 | `MidFlight hangs before Codex responds` | Codex inherited an open stdin and is waiting for EOF | Upgrade MidFlight; stdin is now detached |
-| `Video file exceeds 20MB limit` | Gemini inline-file limit | Compress or trim the video |
+| `Video file is NMB and <provider> reads at most NMB` | Over the provider limit (100MB `agy`, 20MB Gemini) and no `ffmpeg` to shrink it | `brew install ffmpeg`, or compress or trim the video |
+| `Video links need yt-dlp` | `--video` got a link and `yt-dlp` is not on `PATH` | `brew install yt-dlp`, or download the file and pass the path |
+| `Could not download the video with yt-dlp` | Private, removed, or region-locked video, or an old `yt-dlp` | `yt-dlp -U`; try the link in `yt-dlp` directly |
+| `This video is too long to fit` | Even at 360p the video does not fit the provider limit | Trim it or split it into parts |
 | `Could not determine file size` | `stat` failed on the video | Check path and permissions |
 
 Debug logs: run the host with debug on (e.g. `claude --debug`). Lines are prefixed `[mid-flight]` on stderr (mode, provider, query size, response size, duration).
@@ -532,7 +548,7 @@ Each invocation gets its own temp run workspace for staged inputs, prompt assemb
 
 Consult write limits are per provider. Codex and Grok can block project writes. Claude consult uses plan mode. Antigravity, Gemini, OpenCode, and Oz follow their own permission settings. See [Consult and file writes](#consult-and-file-writes).
 
-Video mode copies local files into a staging dir. Gemini gets `@path` plus `--include-directories`. Antigravity gets `--add-dir` and a plain path in the prompt (no `@path` syntax). URLs go in the prompt as-is. Gemini's 20MB inline-file limit is checked up front.
+Video mode stages one file in its own directory inside the run workspace, and the provider is given only that directory. A link is downloaded there with `yt-dlp`. A file over the provider limit, or in a format the provider does not read, is re-encoded there with `ffmpeg`. Everything else is copied with its extension kept. Gemini gets `@path` plus `--include-directories`. Antigravity gets `--add-dir`, a plain path in the prompt (no `@path` syntax), and a line telling it to open the file with its file-reading tool and stay out of the workspace. Without that line it tends to probe the file with `ffprobe` and scripts, which is slower and cannot hear the audio.
 
 </details>
 

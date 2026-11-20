@@ -24,7 +24,7 @@ bash "<path-to-this-skill>/scripts/run.sh"
 2. If it passes:
    - Confirm config looks healthy
    - Mention the active provider
-   - Call out non-blocking warnings (e.g. neither `agy` nor Gemini for video)
+   - Call out non-blocking warnings (e.g. neither `agy` nor Gemini for video, or `yt-dlp` / `ffmpeg` missing for video links and oversized files)
 3. If it fails:
    - List blocking issues clearly
    - Suggest the most direct fixes

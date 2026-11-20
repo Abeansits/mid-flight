@@ -17,6 +17,7 @@ grok_effort=""
 claude_model=""
 CONFIG_VALIDATION_ISSUES=()
 AGY_INSTALL_URL="https://antigravity.google/docs/cli/install"
+YT_DLP_INSTALL_URL="https://github.com/yt-dlp/yt-dlp#installation"
 GEMINI_INSTALL_URL="https://github.com/google-gemini/gemini-cli"
 
 config_file_path() {
