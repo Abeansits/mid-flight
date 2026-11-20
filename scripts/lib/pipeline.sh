@@ -8,6 +8,9 @@ VIDEO_SOURCE=""
 VIDEO_PROMPT=""
 # Below this video bitrate a shrunk file is not worth analyzing.
 VIDEO_MIN_KBPS=60
+# Demuxers ffmpeg may use on the input: MP4/MOV/3GP, MKV/WebM, AVI, FLV,
+# MPEG-PS, MPEG-TS, and ASF/WMV. Playlists and scripts (hls, concat) are out.
+VIDEO_FFMPEG_FORMATS="mov,matroska,avi,flv,mpeg,mpegts,asf"
 FULL_PROMPT=""
 GEMINI_INCLUDE_DIR=""
 RESPONSE_FILE=""
@@ -316,12 +319,17 @@ transcode_video_to_fit() {
   local attempt
   local out_size=""
 
-  duration="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$source_path" 2>/dev/null | head -n 1)"
+  # The input may be a download. A playlist or concat script named .mp4 could
+  # make ffmpeg read other local files or fetch URLs, and the result is sent
+  # to the provider. Allow only local file reads and real container formats.
+  local input_guard=(-protocol_whitelist file -format_whitelist "$VIDEO_FFMPEG_FORMATS")
+
+  duration="$(ffprobe -v error "${input_guard[@]}" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$source_path" 2>/dev/null | head -n 1)"
   duration="${duration%%.*}"
   if ! [[ "$duration" =~ ^[0-9]+$ ]]; then
     error_exit \
       "ffprobe could not read the duration: $source_path" \
-      "Error: ffprobe could not read this video, so MidFlight cannot convert it. Check that the file is a playable video."
+      "Error: ffprobe could not read this video, so MidFlight cannot convert it. Check that the file is a playable MP4, MOV, MKV, WebM, AVI, FLV, MPEG, or WMV video."
   fi
   duration=$((duration + 1))
 
@@ -351,6 +359,7 @@ transcode_video_to_fit() {
 
     log "ffmpeg: ${height}p at ${fps}fps, ${video_kbps}kbps video, ${audio_kbps}kbps audio"
     if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
+      "${input_guard[@]}" \
       -i "$source_path" \
       -map 0:v:0 -map '0:a:0?' \
       -vf "scale=-2:'min(${height},ih)',fps=${fps}" \

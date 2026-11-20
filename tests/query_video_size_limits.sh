@@ -51,6 +51,10 @@ assert_eq "video-gemini-shrunk-ok" "$output" "an oversized video should be shrun
 ffmpeg_args="$(cat "$TEST_DIR/ffmpeg_args.txt")"
 assert_contains "$ffmpeg_args" "$VIDEO_FILE" "ffmpeg should read the original file"
 assert_contains "$ffmpeg_args" "video_input.mp4" "ffmpeg should write the staged MP4"
+# The input may be a download, so ffmpeg is held to local files and real
+# container formats. A playlist named .mp4 must not pull in other files.
+assert_contains "$ffmpeg_args" "-protocol_whitelist" "ffmpeg should restrict input protocols"
+assert_contains "$ffmpeg_args" "-format_whitelist" "ffmpeg should restrict input formats"
 # 20MB over 31s leaves about 5Mbps, which is capped at 2.5Mbps and kept at 720p.
 assert_contains "$ffmpeg_args" "2500k" "the video bitrate should be capped at 2500k"
 assert_contains "$ffmpeg_args" "min(720,ih)" "a generous budget should keep 720p"
