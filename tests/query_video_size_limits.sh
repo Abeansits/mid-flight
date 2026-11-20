@@ -75,6 +75,21 @@ set -e
 assert_eq "1" "$status" "a video too long to fit should fail"
 assert_contains "$output" "too long to fit" "the error should say the video is too long"
 
+# A file ffprobe refuses (not a video, or a script dressed as one) is an
+# explained error, not a silent exit.
+cat > "$TEST_DIR/bin/ffprobe" <<'EOF2'
+#!/bin/bash
+echo "Format not on whitelist" >&2
+exit 1
+EOF2
+chmod +x "$TEST_DIR/bin/ffprobe"
+set +e
+output="$(run_query "$VIDEO_FILE" video "Describe it." 2>/dev/null)"
+status=$?
+set -e
+assert_eq "1" "$status" "a file ffprobe cannot read should fail"
+assert_contains "$output" "ffprobe could not read this video" "the error should say ffprobe refused the file"
+
 # MIDFLIGHT_VIDEO_MAX_MB overrides the provider limit.
 write_config <<'EOF2'
 provider=agy

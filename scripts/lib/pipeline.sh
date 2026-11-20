@@ -324,7 +324,9 @@ transcode_video_to_fit() {
   # to the provider. Allow only local file reads and real container formats.
   local input_guard=(-protocol_whitelist file -format_whitelist "$VIDEO_FFMPEG_FORMATS")
 
-  duration="$(ffprobe -v error "${input_guard[@]}" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$source_path" 2>/dev/null | head -n 1)"
+  # "|| true": under pipefail a failing ffprobe would end the script here,
+  # before the error below can explain why.
+  duration="$(ffprobe -v error "${input_guard[@]}" -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$source_path" 2>/dev/null | head -n 1 || true)"
   duration="${duration%%.*}"
   if ! [[ "$duration" =~ ^[0-9]+$ ]]; then
     error_exit \
