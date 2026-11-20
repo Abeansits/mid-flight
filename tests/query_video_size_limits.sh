@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
 setup_test_env
 trap cleanup_test_env EXIT
+hide_system_tools ffmpeg ffprobe
 
 VIDEO_FILE="$TEST_DIR/big.mp4"
 write_sized_file "$VIDEO_FILE" 25
@@ -57,7 +58,8 @@ assert_contains "$ffmpeg_args" "-protocol_whitelist" "ffmpeg should restrict inp
 assert_contains "$ffmpeg_args" "-format_whitelist" "ffmpeg should restrict input formats"
 # 20MB over 31s leaves about 5Mbps, which is capped at 2.5Mbps and kept at 720p.
 assert_contains "$ffmpeg_args" "2500k" "the video bitrate should be capped at 2500k"
-assert_contains "$ffmpeg_args" "min(720,ih)" "a generous budget should keep 720p"
+assert_contains "$ffmpeg_args" "trunc(min(720,ih)/2)*2" \
+  "a generous budget should keep 720p, rounded to an even height"
 
 # A long video gets a lower bitrate and resolution instead of an error.
 write_ffmpeg_stubs 600

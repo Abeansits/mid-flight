@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
 setup_test_env
 trap cleanup_test_env EXIT
+hide_system_tools yt-dlp ffmpeg ffprobe
 
 write_config <<'EOF2'
 provider=codex
@@ -25,8 +26,12 @@ assert_eq "video-url-ok" "$output" "a video link should be answered by the provi
 assert_contains "$ytdlp_args" "$URL" "yt-dlp should receive the link"
 assert_contains "$ytdlp_args" "--no-playlist" "yt-dlp should fetch one video, not a playlist"
 assert_contains "$ytdlp_args" "!is_live" "yt-dlp should skip live streams"
+assert_contains "$ytdlp_args" "after_move:filepath" "yt-dlp should report the finished file"
+assert_contains "$ytdlp_args" "--no-simulate" "asking for the path must not turn the download into a dry run"
+# The stub leaves video.info.json next to the video. Staging that instead
+# would show up here as video_input.json.
 assert_contains "$captured_prompt" "${add_dir}/video_input.mp4" \
-  "the provider should get the downloaded file by path"
+  "the provider should get the downloaded video by path, not the metadata next to it"
 assert_contains "$captured_prompt" "What happens in this clip?" \
   "the video prompt should reach the provider"
 if [[ "$captured_prompt" == *"youtube.com"* ]]; then
@@ -36,7 +41,7 @@ fi
 
 # Without ffmpeg there is nothing to merge streams with, so yt-dlp must be
 # asked for one pre-merged file.
-assert_contains "$ytdlp_args" "res:720,ext:mp4" "yt-dlp should cap the download at 720p"
+assert_contains "$ytdlp_args" "res:720,ext:mp4" "yt-dlp should prefer 720p"
 if [[ "$ytdlp_args" == *"--merge-output-format"* ]]; then
   echo "FAIL: yt-dlp must not be asked to merge streams when ffmpeg is missing" >&2
   exit 1

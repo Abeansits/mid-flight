@@ -342,7 +342,7 @@ The provider watches a file, never a link. Both CLIs answer a bare link from web
 | Largest file | 100MB | 20MB |
 | Read as-is | MP4, M4V, MOV, WebM, AVI, MKV | MP4, M4V, MOV, WebM, AVI, MPEG, FLV, WMV, 3GP |
 
-- **Links** need [`yt-dlp`](https://github.com/yt-dlp/yt-dlp#installation) (`brew install yt-dlp`). It works for YouTube and most video sites. The download is capped at 720p. `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes the cap. Without `yt-dlp`, only a direct link to a media file works, through `curl`. Live streams are refused.
+- **Links** need [`yt-dlp`](https://github.com/yt-dlp/yt-dlp#installation) (`brew install yt-dlp`). It works for YouTube and most video sites. The download prefers 720p or lower, and takes the smallest larger version when the site offers nothing that small. `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes the preferred height. Without `yt-dlp`, only a direct link to a media file works, through `curl`. Live streams are refused.
 - **Oversized or unusual files** need `ffmpeg` and `ffprobe` (`brew install ffmpeg`). MidFlight re-encodes the staged copy to fit the provider limit. Your file is not touched. It lowers resolution and frame rate before it gives up. Without `ffmpeg`, an oversized file is an error and an unusual format is sent as it is.
 - **Length.** `agy` read a 20-minute clip at one frame per second in testing. A video too long to fit the size limit at a watchable quality is an error. That is about 2 hours on `agy` and about 25 minutes on Gemini.
 - `MIDFLIGHT_VIDEO_MAX_MB` overrides the size limit for both providers.

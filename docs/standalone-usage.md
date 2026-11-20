@@ -196,8 +196,9 @@ midflight -f query.md
 - **`--video FILE|URL`** — forces video mode. A configured or `-p` provider of
   `agy` or `gemini` stays. Any other provider prefers `agy` on `PATH`, else
   Gemini. Trailing text is the prompt; with no prompt the engine uses its
-  default scene-breakdown prompt. A link is downloaded with `yt-dlp` (capped
-  at 720p, `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes that) and analyzed as a file;
+  default scene-breakdown prompt. A link is downloaded with `yt-dlp` (720p or
+  lower when the site offers it, `MIDFLIGHT_VIDEO_MAX_HEIGHT` changes that)
+  and analyzed as a file;
   the providers do not watch a bare link. `agy` reads files up to 100MB and
   Gemini up to 20MB. A larger file, or a format the provider does not read, is
   re-encoded with `ffmpeg` when it is installed. `MIDFLIGHT_VIDEO_MAX_MB`

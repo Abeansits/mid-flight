@@ -213,6 +213,16 @@ video_extension_is_native() {
   return 1
 }
 
+# True for an extension that names a video file, as opposed to the partial
+# downloads and metadata that can sit next to one.
+video_extension_is_media() {
+  case "$1" in
+    mp4|m4v|mov|webm|avi|mkv|mpeg|mpg|flv|wmv|3gp) return 0 ;;
+  esac
+
+  return 1
+}
+
 # Fetch a remote video into the run workspace and point VIDEO_SOURCE at it.
 # yt-dlp handles YouTube and most hosts. Without it, only a direct link to a
 # media file can be fetched, with curl.
@@ -220,11 +230,13 @@ download_video_url() {
   local url="$1"
   local download_dir="$RUN_DIR/download"
   local download_log="$RUN_DIR/download.log"
+  local download_paths="$RUN_DIR/download.paths"
   local max_height="${MIDFLIGHT_VIDEO_MAX_HEIGHT:-720}"
   local url_file=""
   local url_ext=""
   local candidate=""
   local downloaded=""
+  local printed_path=""
   local args=()
 
   mkdir -p "$download_dir"
@@ -235,9 +247,14 @@ download_video_url() {
   fi
 
   if command -v yt-dlp >/dev/null 2>&1; then
-    log "video source: URL, downloading with yt-dlp (up to ${max_height}p)..."
+    log "video source: URL, downloading with yt-dlp (prefers up to ${max_height}p)..."
+    # --print reports the finished file. A yt-dlp config of the user's can
+    # write metadata, subtitles, or thumbnails next to it, so the path is
+    # asked for instead of guessed. --no-simulate: --print alone would skip
+    # the download.
     args=(--no-playlist --no-progress --quiet --no-warnings --socket-timeout 30
-      --match-filter '!is_live' -o "$download_dir/video.%(ext)s")
+      --match-filter '!is_live' -o "$download_dir/video.%(ext)s"
+      --no-simulate --print after_move:filepath)
     if command -v ffmpeg >/dev/null 2>&1; then
       args+=(-f 'bv*+ba/b' -S "res:${max_height},ext:mp4:m4a" --merge-output-format mp4)
     else
@@ -246,11 +263,17 @@ download_video_url() {
       args+=(-f 'b' -S "res:${max_height},ext:mp4")
     fi
 
-    if ! yt-dlp "${args[@]}" -- "$url" > "$download_log" 2>&1; then
+    if ! yt-dlp "${args[@]}" -- "$url" > "$download_paths" 2> "$download_log"; then
       error_exit \
         "yt-dlp failed for $url" \
         "Error: Could not download the video with yt-dlp.$(provider_error_excerpt "$download_log") Try 'yt-dlp -U', or download the file yourself and pass the path."
     fi
+
+    while IFS= read -r printed_path || [ -n "$printed_path" ]; do
+      if [ -f "$printed_path" ]; then
+        downloaded="$printed_path"
+      fi
+    done < "$download_paths"
   else
     # Only a link whose last path segment names a media file is fetched
     # directly. A watch page would download as HTML.
@@ -259,14 +282,11 @@ download_video_url() {
     case "$url_file" in
       *.*) url_ext="$(video_extension "$url_file")" ;;
     esac
-    case "$url_ext" in
-      mp4|m4v|mov|webm|avi|mkv|mpeg|mpg|flv|wmv|3gp) ;;
-      *)
-        error_exit \
-          "yt-dlp not found; cannot download $url" \
-          "Error: Video links need yt-dlp. The provider cannot watch a URL, so MidFlight downloads it first. Install it: $YT_DLP_INSTALL_URL (macOS: brew install yt-dlp). Or download the video and pass the file path."
-        ;;
-    esac
+    if ! video_extension_is_media "$url_ext"; then
+      error_exit \
+        "yt-dlp not found; cannot download $url" \
+        "Error: Video links need yt-dlp. The provider cannot watch a URL, so MidFlight downloads it first. Install it: $YT_DLP_INSTALL_URL (macOS: brew install yt-dlp). Or download the video and pass the file path."
+    fi
 
     if ! command -v curl >/dev/null 2>&1; then
       error_exit \
@@ -275,22 +295,25 @@ download_video_url() {
     fi
 
     log "video source: URL, downloading with curl..."
-    if ! curl -fsSL --connect-timeout 30 -o "$download_dir/video.${url_ext}" -- "$url" > "$download_log" 2>&1; then
+    # --speed-*: give up on a server that connects and then stalls (under
+    # 1KB/s for 30 seconds). --connect-timeout covers only the handshake.
+    if ! curl -fsSL --connect-timeout 30 --speed-limit 1024 --speed-time 30 -o "$download_dir/video.${url_ext}" -- "$url" > "$download_log" 2>&1; then
       error_exit \
         "curl failed for $url" \
         "Error: Could not download the video.$(provider_error_excerpt "$download_log") Download the file yourself and pass the path."
     fi
   fi
 
-  for candidate in "$download_dir"/video.*; do
-    case "$candidate" in
-      *.part|*.ytdl|*.tmp) continue ;;
-    esac
-    if [ -f "$candidate" ]; then
-      downloaded="$candidate"
-      break
-    fi
-  done
+  # curl, or a yt-dlp too old to print the path: take the media file, never
+  # a partial download or a metadata file.
+  if [ -z "$downloaded" ]; then
+    for candidate in "$download_dir"/video.*; do
+      if [ -f "$candidate" ] && video_extension_is_media "$(video_extension "$candidate")"; then
+        downloaded="$candidate"
+        break
+      fi
+    done
+  fi
 
   if [ -z "$downloaded" ] || [ ! -s "$downloaded" ]; then
     error_exit \
@@ -364,7 +387,7 @@ transcode_video_to_fit() {
       "${input_guard[@]}" \
       -i "$source_path" \
       -map 0:v:0 -map '0:a:0?' \
-      -vf "scale=-2:'min(${height},ih)',fps=${fps}" \
+      -vf "scale=-2:'trunc(min(${height},ih)/2)*2',fps=${fps}" \
       -c:v libx264 -preset veryfast \
       -b:v "${video_kbps}k" -maxrate "${video_kbps}k" -bufsize "$((video_kbps * 2))k" \
       -pix_fmt yuv420p \

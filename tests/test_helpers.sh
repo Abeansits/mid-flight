@@ -13,6 +13,23 @@ setup_test_env() {
   export PATH="$TEST_DIR/bin:/usr/bin:/bin"
 }
 
+# Swap /usr/bin and /bin on PATH for a mirror without the named tools, so
+# `command -v` reports them missing on machines that have them installed
+# there. Stubs in $TEST_DIR/bin still win.
+hide_system_tools() {
+  local mirror="$TEST_DIR/sysbin"
+  local tool
+
+  mkdir -p "$mirror"
+  # /usr/bin last, so it wins a name clash as it does on the normal test PATH.
+  ln -sf /bin/* /usr/bin/* "$mirror"/ 2>/dev/null || true
+  for tool in "$@"; do
+    rm -f "$mirror/$tool"
+  done
+
+  export PATH="$TEST_DIR/bin:$mirror"
+}
+
 cleanup_test_env() {
   if [ -n "${TEST_DIR:-}" ] && [ -d "$TEST_DIR" ]; then
     rm -rf "$TEST_DIR"
@@ -255,13 +272,21 @@ write_ytdlp_stub() {
 set -euo pipefail
 printf '%s\n' "\$@" > "$TEST_DIR/ytdlp_args.txt"
 template=""
+print=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -o) template="\$2"; shift 2 ;;
+    --print) print="\$2"; shift 2 ;;
     *) shift ;;
   esac
 done
+# A metadata file that sorts before the video, as a user's yt-dlp config
+# with --write-info-json would leave.
+printf '{}' > "\${template%.*}.info.json"
 printf 'downloaded-video-bytes' > "\${template%.*}.$ext"
+if [ -n "\$print" ]; then
+  printf '%s\n' "\${template%.*}.$ext"
+fi
 EOF2
   chmod +x "$TEST_DIR/bin/yt-dlp"
 }
