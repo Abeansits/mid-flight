@@ -48,7 +48,7 @@ Do **not** silently call provider=codex from this host without that override.
 
 2. **Parse arguments** — Check the user's invocation for flags and content:
 
-   - **`--video <file-or-url>`** — Video analysis. Extract the video source and any remaining text as the question/prompt.
+   - **`--video <file-or-url>`** — Video analysis. Extract the video source and any remaining text as the question/prompt. Pass a link through unchanged. The engine downloads it with `yt-dlp` and analyzes the file.
    - **Text question** — Standard text consultation.
    - **Empty** — Identify what would most benefit from a second opinion from the conversation so far.
    - **`--allow-codex-provider`** — Forward to the runner if present.
