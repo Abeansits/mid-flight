@@ -356,7 +356,7 @@ Video generation (`--video-gen`) is Grok only. A `grok` config is kept. Any othe
 
 Codex consult passes `--sandbox read-only`. Implement and image generation pass `--sandbox workspace-write`. The sandbox covers model-generated shell and tool writes. Codex still writes session files under `$CODEX_HOME`. Video analysis does not select Codex. `query_codex` still passes `--sandbox read-only` for every mode except implement and image generation.
 
-When `~/.codex` is a symlink, MidFlight sets `CODEX_HOME` to that directory's real path for the Codex process. The temporary home from `-p`, `--model`, or `-c` symlinks `~/.codex`. Codex refuses writable roots such as `~/.codex/memories` when a path component is a symlink, and it skips creating helper binaries under that home. A `CODEX_HOME` already set in the environment is passed through unchanged. `allow_symlinked_codex_home = true` in `~/.codex/config.toml` is a user-global trust setting. MidFlight does not write that file.
+When `~/.codex` is a symlink, MidFlight sets `CODEX_HOME` to that directory's real path for the Codex process. Overrides via `-p`, `--model`, or `-c` stage a temporary config file via `MIDFLIGHT_CONFIG` without swapping `$HOME`, so provider CLIs keep their real home directory. Codex refuses writable roots such as `~/.codex/memories` when a path component is a symlink, and it skips creating helper binaries under that home. A `CODEX_HOME` already set in the environment is passed through unchanged. `allow_symlinked_codex_home = true` in `~/.codex/config.toml` is a user-global trust setting. MidFlight does not write that file.
 
 Grok consult passes `--sandbox read-only`. That profile still writes `~/.grok` and temp directories. An enterprise `requirements.toml` pin can override the CLI flag. Implement, image generation, and video generation pass `--always-approve` and leave the sandbox off so those modes can write.
 
@@ -405,7 +405,7 @@ fm_model=
 |---|---|---|
 | `provider` | `codex` | `codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, `claude`, or `fm` |
 | `codex_model` | `gpt-6-sol` | Codex model |
-| `codex_reasoning_effort` | `high` | `low`, `medium`, `high` |
+| `codex_reasoning_effort` | `high` | `low`, `medium`, `high`, `xhigh` |
 | `agy_model` | unset | Antigravity model slug (`agy models`); blank uses the CLI default |
 | `agy_effort` | unset | `low`, `medium`, `high`; blank uses the CLI default |
 | `gemini_model` | `gemini-3.1-pro-preview` | Gemini Pro. Flash is `gemini-3.8-flash` |
@@ -514,7 +514,7 @@ On macOS, `shasum -a 256 /tmp/midflight.tar.gz` prints the same digest.
 
 `publish` refuses unless local `main` is clean and up to date. Tag from `main`, not a feature branch.
 
-`Formula/midflight.rb` currently installs `v1.18.0`. `brew upgrade` stays on that tag until the formula change for a newer tag is on `main`.
+`Formula/midflight.rb` currently installs `v1.19.2`. `brew upgrade` stays on that tag until the formula change for a newer tag is on `main`.
 
 #### Release smoke check
 

@@ -114,16 +114,27 @@ assert_eq "unset" "$(cat "$TEST_DIR/codex_home_state.txt")" \
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
   "consult must still pass --sandbox read-only when ~/.codex is dangling"
 
-# -p builds the temp home that symlinks the real ~/.codex. Same export.
+# -p keeps the real HOME (staged config via MIDFLIGHT_CONFIG).
+# A real ~/.codex stays direct (CODEX_HOME unset); a symlinked ~/.codex still resolves CODEX_HOME.
 rm -f "$HOME/.codex"
 mkdir -p "$HOME/.codex"
-canonical="$(cd "$HOME/.codex" && pwd -P)"
-output="$(run_cli -p codex "Which home does the temp overlay use?")"
+output="$(run_cli -p codex "Which home does -p use?")"
 assert_eq "codex-home-ok" "$output" "-p codex should still return stubbed codex output"
+assert_eq "" "$(cat "$TEST_DIR/codex_home.txt")" \
+  "-p with a real ~/.codex should leave CODEX_HOME unset"
+assert_eq "unset" "$(cat "$TEST_DIR/codex_home_state.txt")" \
+  "-p with a real ~/.codex should leave CODEX_HOME unset"
+assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \
+  "consult via -p must still pass --sandbox read-only"
+
+rmdir "$HOME/.codex"
+ln -s "$canonical" "$HOME/.codex"
+output="$(run_cli -p codex "Which home does -p use with symlinked ~/.codex?")"
+assert_eq "codex-home-ok" "$output" "-p codex with symlinked ~/.codex should still return stubbed codex output"
 assert_eq "$canonical" "$(cat "$TEST_DIR/codex_home.txt")" \
-  "a temp HOME from -p should export the real ~/.codex"
+  "-p with a symlinked ~/.codex should export the real ~/.codex"
 assert_eq "set" "$(cat "$TEST_DIR/codex_home_state.txt")" \
-  "a temp HOME from -p should set CODEX_HOME"
+  "-p with a symlinked ~/.codex should set CODEX_HOME"
 assert_real_dir "$(cat "$TEST_DIR/codex_home.txt")" \
   "the -p CODEX_HOME should be a real directory"
 assert_eq "read-only" "$(cat "$TEST_DIR/codex_sandbox.txt")" \

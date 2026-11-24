@@ -51,6 +51,12 @@ assert_pid_gone() {
     exit 1
   }
   pid="$(cat "$pid_file")"
+  case "$pid" in
+    ''|*[!0-9]*)
+      echo "FAIL: $label recorded invalid pid '$pid'" >&2
+      exit 1
+      ;;
+  esac
   if kill -0 "$pid" 2>/dev/null; then
     echo "FAIL: $label pid $pid still running after timeout" >&2
     exit 1
@@ -130,6 +136,11 @@ while [ "$fast_round" -lt 20 ]; do
   assert_eq "1" "$status" "provider failure under --timeout must exit 1 (round $fast_round)"
   assert_contains "$output" "provider exploded" "provider error should be visible (round $fast_round)"
   assert_contains "$output" "Codex query failed" "engine should report the provider failure (round $fast_round)"
+  if echo "$output" | grep -q 'Killed'; then
+    echo "FAIL: fast failure under --timeout must not emit watchdog Killed noise (round $fast_round)" >&2
+    echo "Output: $output" >&2
+    exit 1
+  fi
   if echo "$output" | grep -q 'timed out'; then
     echo "FAIL: a fast provider failure must not be reported as a timeout (round $fast_round)" >&2
     exit 1
@@ -159,6 +170,45 @@ exit 7
 STUB
   chmod +x "$TEST_DIR/bin/codex"
 done
+
+cat > "$TEST_DIR/bin/codex" <<'STUB'
+#!/bin/bash
+echo "provider exploded" >&2
+# Give the watchdog a moment to exec `sleep 60` so we actually verify it gets reaped.
+i=0
+while [ ! -f "$TEST_DIR/watchdog_sleep.pid" ] && [ "$i" -lt 40 ]; do
+  sleep 0.05 2>/dev/null || sleep 1
+  i=$((i + 1))
+done
+exit 7
+STUB
+chmod +x "$TEST_DIR/bin/codex"
+
+# Record the exact watchdog `sleep 60` PID via a PATH shim rather than pgrep
+# (pgrep fails in sandboxed macOS environments and can collide with unrelated sleeps).
+real_sleep="$(PATH="/usr/bin:/bin" command -v sleep)"
+cat > "$TEST_DIR/bin/sleep" <<STUB
+#!/bin/bash
+if [ "\${1:-}" = "60" ]; then
+  printf '%s\n' "\$\$" > "$TEST_DIR/watchdog_sleep.pid.tmp"
+  mv "$TEST_DIR/watchdog_sleep.pid.tmp" "$TEST_DIR/watchdog_sleep.pid"
+fi
+exec "$real_sleep" "\$@"
+STUB
+chmod +x "$TEST_DIR/bin/sleep"
+
+set +e
+output="$(run_cli --timeout 60 "fast failure under 60s timeout" 2>"$stderr_file")"
+status=$?
+set -e
+rm -f "$TEST_DIR/bin/sleep"
+assert_eq "1" "$status" "fast provider failure under --timeout 60 must exit 1"
+if grep -q 'Killed' "$stderr_file"; then
+  echo "FAIL: --timeout 60 with fast failure left Killed noise on stderr" >&2
+  cat "$stderr_file" >&2
+  exit 1
+fi
+assert_pid_gone "$TEST_DIR/watchdog_sleep.pid" "watchdog sleep 60"
 
 set +e
 output="$(run_cli "test failure propagation" 2>&1)"

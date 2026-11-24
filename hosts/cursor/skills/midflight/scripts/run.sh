@@ -44,12 +44,12 @@ invoke_midflight() {
   local mode="${2:-consult}"
   case "$mode" in
     video)
-      local args=("${PROVIDER_ARGS[@]}" --video "$1")
+      local args=(${PROVIDER_ARGS[@]+"${PROVIDER_ARGS[@]}"} --video "$1")
       [ -n "${3:-}" ] && args+=("$3")
       exec bash "$mf" "${args[@]}"
       ;;
     *)
-      exec bash "$mf" "${PROVIDER_ARGS[@]}" -m "$mode" -f "$1"
+      exec bash "$mf" ${PROVIDER_ARGS[@]+"${PROVIDER_ARGS[@]}"} -m "$mode" -f "$1"
       ;;
   esac
 }

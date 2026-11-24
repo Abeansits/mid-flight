@@ -32,12 +32,33 @@ provider_display_name() {
 provider_error_excerpt() {
   local log_file="$1"
   local excerpt=""
+  local line=""
+  local picked=""
 
   if [ ! -f "$log_file" ]; then
     return 0
   fi
 
-  excerpt="$(tail -n 3 "$log_file" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+  # First line that states the failure. Markers keep this case: error:, Error, fatal.
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      *"error:"*|*"Error"*|*"fatal"*)
+        picked="$line"
+        break
+        ;;
+    esac
+  done < "$log_file"
+
+  # No marker: the old detail is the last three lines.
+  if [ -z "$picked" ]; then
+    picked="$(tail -n 3 "$log_file")"
+  fi
+
+  # Same collapse as the three-line tail, then that tail's one-line budget
+  # (three 80-column lines). A matched line uses this cap too.
+  # -E: macOS sed does not treat \+ as "one or more".
+  excerpt="$(printf '%s\n' "$picked" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+  excerpt="${excerpt:0:240}"
 
   if [ -n "$excerpt" ]; then
     printf ' Details: %s\n' "$excerpt"
@@ -102,7 +123,7 @@ classify_provider_failure() {
 
   # Socket-symlink warnings are matched on the whole log, before auth, so an
   # earlier "permission denied" cannot hide them. Auth, rate limit, and
-  # network use the same last-three-line window as Details.
+  # network still use the last three lines. Details may be an earlier error line.
   case "$normalized" in
     *"runtime-socket deny path"*"endpoint is a symlink"*|*"socket deny resolution failed"*"endpoint is a symlink"*|*"sandbox could not be applied"*"endpoint is a symlink"*)
       # Grok refuses --sandbox read-only when a runtime socket (Docker Desktop's

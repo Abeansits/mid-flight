@@ -83,14 +83,23 @@ assert_eq "read-only" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
   "consult must still pass --sandbox read-only when GROK_HOME is pre-set"
 unset GROK_HOME
 
-# -p builds the temp home that symlinks the real ~/.grok. Same export.
+# -p keeps the real HOME (staged config via MIDFLIGHT_CONFIG).
+# A real ~/.grok stays direct (GROK_HOME unset); a symlinked ~/.grok still resolves GROK_HOME.
 rm -f "$HOME/.grok"
 mkdir -p "$HOME/.grok"
-canonical="$(cd "$HOME/.grok" && pwd -P)"
-output="$(run_cli -p grok "Which home does the temp overlay use?")"
+output="$(run_cli -p grok "Which home does -p use?")"
 assert_eq "grok-home-ok" "$output" "-p grok should still return stubbed grok output"
+assert_eq "" "$(cat "$TEST_DIR/grok_home.txt")" \
+  "-p with a real ~/.grok should leave GROK_HOME unset"
+assert_eq "read-only" "$(cat "$TEST_DIR/grok_sandbox.txt")" \
+  "consult via -p must still pass --sandbox read-only"
+
+rmdir "$HOME/.grok"
+ln -s "$canonical" "$HOME/.grok"
+output="$(run_cli -p grok "Which home does -p use with symlinked ~/.grok?")"
+assert_eq "grok-home-ok" "$output" "-p grok with symlinked ~/.grok should still return stubbed grok output"
 assert_eq "$canonical" "$(cat "$TEST_DIR/grok_home.txt")" \
-  "a temp HOME from -p should export the real ~/.grok"
+  "-p with a symlinked ~/.grok should export the real ~/.grok"
 assert_real_dir "$(cat "$TEST_DIR/grok_home.txt")" \
   "the -p GROK_HOME should be a real directory"
 assert_eq "read-only" "$(cat "$TEST_DIR/grok_sandbox.txt")" \

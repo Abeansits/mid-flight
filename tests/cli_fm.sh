@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
 setup_test_env
 trap cleanup_test_env EXIT
+hide_system_tools fm
 
 reset_fm_logs() {
   rm -f \

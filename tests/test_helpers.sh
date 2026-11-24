@@ -13,6 +13,23 @@ setup_test_env() {
   export PATH="$TEST_DIR/bin:/usr/bin:/bin"
 }
 
+# Swap /usr/bin and /bin on PATH for a mirror without the named tools, so
+# `command -v` reports them missing on machines that have them installed
+# there. Stubs in $TEST_DIR/bin still win.
+hide_system_tools() {
+  local mirror="$TEST_DIR/sysbin"
+  local tool
+
+  mkdir -p "$mirror"
+  # /usr/bin last, so it wins a name clash as it does on the normal test PATH.
+  ln -sf /bin/* /usr/bin/* "$mirror"/ 2>/dev/null || true
+  for tool in "$@"; do
+    rm -f "$mirror/$tool"
+  done
+
+  export PATH="$TEST_DIR/bin:$mirror"
+}
+
 cleanup_test_env() {
   if [ -n "${TEST_DIR:-}" ] && [ -d "$TEST_DIR" ]; then
     rm -rf "$TEST_DIR"
