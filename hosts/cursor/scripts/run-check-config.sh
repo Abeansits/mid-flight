@@ -14,10 +14,10 @@ done
 
 resolve_args=(--check)
 [ -n "$START_DIR" ] && resolve_args+=(--start-dir "$START_DIR")
-# shellcheck disable=SC2207
-resolved=( $(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}") )
-kind="${resolved[0]}"
-engine="${resolved[1]}"
+# Preserve paths that contain spaces (kind is a single token; path is the rest).
+resolved_line="$(bash "$SCRIPT_DIR/resolve-engine.sh" "${resolve_args[@]}")"
+kind="${resolved_line%% *}"
+engine="${resolved_line#* }"
 
 if [ "$kind" != "check" ]; then
   printf 'run-check-config: expected check engine, got %s\n' "$kind" >&2

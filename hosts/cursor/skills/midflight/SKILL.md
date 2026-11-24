@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, or Oz for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 disable-model-invocation: false
 metadata:
   author: Abeansits
@@ -44,7 +44,7 @@ If resolution fails, tell the user to install with Homebrew (`brew tap Abeansits
    - **`--video <file-or-url>`** — Video analysis. Extract the video source and any remaining text as the question/prompt.
    - **Text question** — Standard text consultation.
    - **Empty** — Identify what would most benefit from a second opinion from the conversation so far.
-   - **`--provider <name>`** — Forward to the runner if present (`codex`, `agy`, `opencode`, `oz`, `gemini`).
+   - **`--provider <name>`** — Forward to the runner if present (`codex`, `agy`, `opencode`, `oz`, `gemini`, `grok`, `claude`).
 
 3. **Classify intent** — Set `INTENT` to one of:
 
