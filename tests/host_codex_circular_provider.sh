@@ -7,6 +7,7 @@ source "$ROOT_DIR/tests/test_helpers.sh"
 
 setup_test_env
 trap cleanup_test_env EXIT
+hide_system_tools agy opencode oz gemini grok claude fm
 
 GUARD="$ROOT_DIR/hosts/codex/scripts/prefer-non-codex-provider.sh"
 RUN="$ROOT_DIR/hosts/codex/scripts/run-query.sh"
