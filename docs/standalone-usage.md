@@ -2,7 +2,7 @@
 
 `bin/midflight` is the terminal front door. It parses arguments, assembles a
 query, and calls the engine (`scripts/query.sh`) so you can consult Codex,
-Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from a terminal, script, or
+Gemini, Antigravity, OpenCode, Oz, Grok, Claude, or fm from a terminal, script, or
 CI job. Host skills call the same engine.
 
 `midflight --help` is the short calling contract (exit codes, streams, stdout
@@ -50,8 +50,8 @@ rm -rf ~/.local/lib/mid-flight /usr/local/lib/mid-flight
 ### Prerequisites
 
 - `bash`
-- A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, or `claude`),
-  installed and authenticated.
+- A provider CLI in `PATH` (`codex`, `agy`, `gemini`, `opencode`, `oz`, `grok`, `claude`, or `fm`),
+  installed and authenticated. `fm` ships with macOS 27; one-time setup is `sudo fm license`, then `fm available`.
 - Optionally `~/.config/mid-flight/config` to pick the provider and models.
   Without it, the engine's defaults apply (provider `codex`). See the
   [README config section](../README.md#config).
@@ -64,10 +64,11 @@ midflight --image-gen PROMPT
 midflight --video-gen PROMPT
 
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude | fm (overrides config)
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
+      --effort LEVEL     reasoning effort for codex, agy, or grok (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE     file whose contents become the Context section
@@ -95,6 +96,8 @@ Consult passes a read-only flag only when that CLI has one MidFlight can trust f
 
 Antigravity, Gemini, OpenCode, and Oz consults do not get a read-only flag. Antigravity headless mode auto-allows workspace file writes even when `--dangerously-skip-permissions` is omitted. For those providers the consult prompt is an instruction, and writes follow that CLI's permission settings. Limits are in the README section [Consult and file writes](../README.md#consult-and-file-writes).
 
+`fm` is Apple's Foundation Models CLI (macOS 27). It is consult-only: it has no repo access and no tools, so implement exits 2 (`fm is consult-only (no repo access); use -m consult`). It is allowed as a dual-consult partner. `--model` maps to `fm --model` (`system` on-device) and is omitted when unset. Other values are passed through; macOS 27.0 accepts `system` only, and fm's error is shown as-is. The on-device context window is 4096 tokens (input + output). MidFlight preflights with `fm count-tokens -q` and exits 1 above 3072 tokens so about 1k remain for the reply. A model other than `system` is not preflighted. A missing binary, a missing license, or an unavailable model reports `sudo fm license` and `fm available`. See [Apple fm](../README.md#apple-fm).
+
 ### Dual-consult
 
 Same question to two providers; print both answers. That is the product.
@@ -119,7 +122,7 @@ Rules:
 - Stdout is a labeled dump (`## Provider A` / `## Provider B`) plus a short `## Where they differ` note that is structural only (identical-after-trim, or “compare them yourself”). MidFlight does **not** invent a merged opinion or LLM disagreement analysis.
 - If one provider fails, the successful answer is still printed and the failed side shows its error; exit status is `1`.
 - `--timeout` applies per side (~2N wall-clock for dual). A side that hits the bound shows `Error: timed out after Ns waiting for provider response` in its section.
-- `--model` is not combined with dual (set per-provider models in config). `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
+- `--model` is not combined with dual (set per-provider models in config). `--effort` is also single-provider only. `--dual` and `--providers` are mutually exclusive; `--providers` also rejects a simultaneous `-p`.
 
 ### Git-derived context
 
@@ -235,24 +238,32 @@ midflight -f query.md
 
 ## Provider and config overrides
 
-`-p/--provider`, `--model`, and `-c/--config` let you change the provider, model,
-or config for a single call without editing your real config. The CLI composes
-an effective config in a temporary home and points the engine at it, while symlinking
-the rest of your home directory through so provider CLIs keep their authentication.
-Your `~/.config/mid-flight/config` is never modified. When that temporary home's
-`~/.codex` is a symlink and `CODEX_HOME` is unset, the Codex process receives
-`CODEX_HOME` set to the real directory. A `CODEX_HOME` already set in the
-environment is passed through unchanged.
+`-p/--provider`, `--model`, `--effort`, and `-c/--config` let you change the
+provider, model, effort, or config for a single call without editing your real
+config. The CLI composes an effective config file in a temporary directory and
+passes it to the engine via `MIDFLIGHT_CONFIG`, leaving `$HOME` and your
+`~/.config/mid-flight/config` untouched so provider CLIs keep their real home,
+auth, and account state. When `~/.codex` is itself a symlink and `CODEX_HOME`
+is unset, the Codex process receives `CODEX_HOME` set to the real directory. A
+`CODEX_HOME` already set in the environment is passed through unchanged.
 
 `--model` maps to the appropriate config key based on the active provider:
 - `-p codex --model gpt-6-sol` → sets `codex_model`
 - `-p gemini --model gemini-3.1-pro-preview` → sets `gemini_model`
 - `-p agy --model gemini-3.1-pro-high` → sets `agy_model`
+- `-p fm --model system` → sets `fm_model` (`system` on-device; blank omits `--model`; other values are passed through)
 - `--model gemini-3.8-flash` (no `-p`) → sets the model for whatever provider is
   active in your config
 - `--video clip.mp4 --model gemini-3.8-flash` (no `-p`) → sets `agy_model` and
   `gemini_model`. A configured `agy` or `gemini` stays; otherwise video prefers
   `agy` on `PATH`, else Gemini
+
+`--effort` maps to the active provider's effort key when it has one:
+- `-p codex --effort xhigh` → sets `codex_reasoning_effort`
+- `-p agy --effort high` → sets `agy_effort`
+- `-p grok --effort medium` → sets `grok_effort`
+- Providers without an effort setting (`gemini`, `opencode`, `oz`, `claude`, `fm`) and
+  dual-consult (`--dual`, `--providers`) exit `2` with a `midflight:` error on stderr.
 
 ## Exit codes
 
@@ -262,7 +273,8 @@ environment is passed through unchanged.
   That covers a bad mode, a missing question, conflicting flags, missing files
   passed to `--context` / `--config` / `--query-file`, dual-consult misuse
   (implement, video, image-gen, video-gen, the same provider twice,
-  `--dual` with `--providers`, `--model` with dual, an unknown dual name),
+  `--dual` with `--providers`, `--model` or `--effort` with dual, `--effort` with a provider that has no effort setting, an unknown dual name),
+  and `fm` outside consult (`fm is consult-only`),
   `--git-status` / `--diff` outside a git work tree or without `git` on `PATH`,
   a readable PNG or JPEG opening frame that conflicts with `--aspect`, and an
   `-p` value `--image-gen` or `--video-gen` rejects.

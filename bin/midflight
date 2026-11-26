@@ -45,7 +45,7 @@ version() {
 
 usage() {
   cat <<'EOF'
-midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude from any terminal.
+midflight — consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, Claude, or fm from any terminal.
 
 Usage:
   midflight [OPTIONS] [QUESTION...]
@@ -82,14 +82,16 @@ Calling contract:
   Stdin is ignored. -- ends options (a question that starts with - needs it).
   Implement can write the workspace. Codex, Grok, and Claude consults are
           read-only. Antigravity, Gemini, OpenCode, and Oz follow that CLI's
-          permission settings. Sandbox details: docs/standalone-usage.md.
+          permission settings. fm is consult-only (no repo access) and needs
+          macOS 27. Sandbox details: docs/standalone-usage.md.
 
 Options:
   -m, --mode MODE        consult | implement | video   (default: consult)
-  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude (overrides config)
+  -p, --provider NAME    codex | gemini | agy | opencode | oz | grok | claude | fm (overrides config)
       --dual PROVIDER    dual-consult: primary from -p/config, plus PROVIDER (consult-only)
       --providers A,B    dual-consult with both providers named explicitly (consult-only)
       --model MODEL      model to use for the active provider (overrides config; not with dual)
+      --effort LEVEL     reasoning effort for codex, agy, or grok (overrides config; not with dual)
   -c, --config FILE      use an alternate config file
   -f, --query-file FILE  send a pre-built query file straight to the engine
       --context FILE      file whose contents become the Context section
@@ -153,6 +155,7 @@ PROVIDER=""
 DUAL_PROVIDER=""
 PROVIDERS_LIST=""
 MODEL=""
+EFFORT=""
 CONFIG_FILE=""
 QUERY_FILE=""
 CONTEXT_FILE=""
@@ -194,6 +197,7 @@ while [ $# -gt 0 ]; do
       ;;
     --providers)     require_option_value "a provider list" "$@"; PROVIDERS_LIST="$2"; shift 2 ;;
     --model)         require_option_value "a model name" "$@"; MODEL="$2"; shift 2 ;;
+    --effort)        require_option_value "an effort level" "$@"; EFFORT="$2"; shift 2 ;;
     -c|--config)     require_option_value "a config file" "$@"; CONFIG_FILE="$2"; shift 2 ;;
     -f|--query-file) require_option_value "a query file" "$@"; QUERY_FILE="$2"; shift 2 ;;
     --context)       require_option_value "a context file" "$@"; CONTEXT_FILE="$2"; shift 2 ;;
@@ -421,6 +425,7 @@ provider_label() {
     oz) printf '%s\n' "Oz" ;;
     grok) printf '%s\n' "Grok" ;;
     claude) printf '%s\n' "Claude" ;;
+    fm) printf '%s\n' "fm" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -428,8 +433,8 @@ provider_label() {
 require_known_provider() {
   local name="$1" flag="$2"
   case "$name" in
-    codex|gemini|agy|opencode|oz|grok|claude) ;;
-    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, or claude)" ;;
+    codex|gemini|agy|opencode|oz|grok|claude|fm) ;;
+    *) die "unknown provider '$name' for $flag (expected codex, gemini, agy, opencode, oz, grok, claude, or fm)" ;;
   esac
 }
 
@@ -451,6 +456,9 @@ if [ "$want_dual" -eq 1 ]; then
   fi
   if [ -n "$MODEL" ]; then
     die "--model cannot be combined with dual-consult; set per-provider models in ~/.config/mid-flight/config"
+  fi
+  if [ -n "$EFFORT" ]; then
+    die "--effort cannot be combined with dual-consult; set per-provider effort in ~/.config/mid-flight/config"
   fi
   if [ -z "$DUAL_PROVIDER" ] && [ -z "$PROVIDERS_LIST" ]; then
     die "dual-consult requires --dual PROVIDER or --providers A,B"
@@ -490,11 +498,12 @@ resolve_dual_providers() {
       PRIMARY_PROVIDER="$(normalize_provider_name "$PROVIDER")"
       require_known_provider "$PRIMARY_PROVIDER" "-p/--provider"
     else
+      local default_cfg="${MIDFLIGHT_CONFIG:-$HOME/.config/mid-flight/config}"
       if [ -n "$CONFIG_FILE" ]; then
         [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
-        cfg_provider="$(grep '^provider=' "$CONFIG_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
-      elif [ -f "$HOME/.config/mid-flight/config" ]; then
-        cfg_provider="$(grep '^provider=' "$HOME/.config/mid-flight/config" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+        cfg_provider="$(grep '^provider=' "$CONFIG_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
+      elif [ -f "$default_cfg" ]; then
+        cfg_provider="$(grep '^provider=' "$default_cfg" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
       fi
       if [ -n "$cfg_provider" ]; then
         PRIMARY_PROVIDER="$(normalize_provider_name "$cfg_provider")"
@@ -530,118 +539,145 @@ cleanup() { [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ] && rm -rf "$WORKDIR"; }
 trap cleanup EXIT
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/midflight-cli.XXXXXX")"
 
-# Symlink each entry of src into dest, skipping one name. Lets the temp config
-# home mirror the real home so passthrough still resolves there.
-# -f: dual-consult calls build_config_home once per side; replace existing links.
-# -n: if dest is a symlink, replace it rather than following into a directory.
-mirror_dir() {
-  local src="$1" dest="$2" skip="$3" entry base
-  [ -d "$src" ] || return 0
-  for entry in "$src"/* "$src"/.[!.]*; do
-    [ -e "$entry" ] || continue
-    base="${entry##*/}"
-    [ "$base" = "$skip" ] && continue
-    ln -sfn "$entry" "$dest/$base"
-  done
-}
+# Stage a temporary config file so -p/--model/-c can override config without
+# swapping $HOME or touching the user's real config. Keeping the real $HOME
+# lets provider CLIs (codex, grok, agy, ...) read their own auth and account
+# state directly. Dual-consult calls this once per side into the same WORKDIR.
+build_staged_config() {
+  local config="$WORKDIR/config"
+  local base_config="${MIDFLIGHT_CONFIG:-$HOME/.config/mid-flight/config}"
 
-# Build a temporary config home so -p/-c can override config without touching
-# the engine or the user's real config. The engine only reads $HOME for the
-# config file, but provider CLIs read $HOME for their own auth, so the real
-# home's contents are symlinked through; only the mid-flight config is replaced.
-#
-# Dual-consult invokes this twice (once per provider) into the same WORKDIR.
-# Wipe first so a populated real HOME does not make the second `ln` fail with
-# "File exists".
-build_config_home() {
-  local home_dir="$WORKDIR/home"
-  rm -rf "$home_dir"
-  mkdir -p "$home_dir/.config/mid-flight"
-  mirror_dir "$HOME" "$home_dir" ".config"
-  mirror_dir "$HOME/.config" "$home_dir/.config" "mid-flight"
-
-  local config="$home_dir/.config/mid-flight/config"
   if [ -n "$CONFIG_FILE" ]; then
     [ -f "$CONFIG_FILE" ] || die "config file not found: $CONFIG_FILE"
     cp "$CONFIG_FILE" "$config"
-  elif [ -f "$HOME/.config/mid-flight/config" ]; then
-    cp "$HOME/.config/mid-flight/config" "$config"
+  elif [ -f "$base_config" ]; then
+    cp "$base_config" "$config"
   else
     : > "$config"
   fi
 
-  if [ -n "$PROVIDER" ]; then
-    grep -v '^provider=' "$config" > "$config.tmp" 2>/dev/null || true
-    printf 'provider=%s\n' "$PROVIDER" >> "$config.tmp"
+  write_config_key() {
+    local key="$1"
+    local val="$2"
+    grep -v "^${key}=" "$config" > "$config.tmp" 2>/dev/null || true
+    printf '%s=%s\n' "$key" "$val" >> "$config.tmp"
     mv "$config.tmp" "$config"
+  }
+
+  if [ -n "$PROVIDER" ]; then
+    write_config_key "provider" "$PROVIDER"
   fi
 
-  if [ -n "$MODEL" ]; then
+  if [ -n "$MODEL" ] || [ -n "$EFFORT" ]; then
     local effective_provider="$PROVIDER"
-    local write_google_models="false"
-    local write_image_models="false"
-    local write_video_model="false"
-
-    if [ "$MODE" = "video" ]; then
-      case "$effective_provider" in
-        gemini|agy|antigravity) ;;
-        *)
-          # Engine picks agy-if-present else gemini. Stamp both keys.
-          write_google_models="true"
-          ;;
-      esac
-    elif [ -z "$effective_provider" ]; then
-      effective_provider="$(grep '^provider=' "$config" | cut -d= -f2 | tr -d '[:space:]')"
+    if [ -z "$effective_provider" ]; then
+      effective_provider="$(grep '^provider=' "$config" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' || true)"
     fi
-    [ -z "$effective_provider" ] && [ "$write_google_models" != "true" ] && effective_provider="codex"
+    [ -z "$effective_provider" ] && effective_provider="codex"
 
-    # image-gen uses grok or codex. A different configured provider is replaced
-    # by the engine, so stamp both model keys the fallback might read.
-    if [ "$MODE" = "image-gen" ]; then
-      case "$effective_provider" in
-        codex|grok|grok-build) ;;
-        *) write_image_models="true" ;;
-      esac
+    if [ -n "$MODEL" ]; then
+      local write_google_models="false"
+      local write_image_models="false"
+      local write_video_model="false"
+
+      if [ "$MODE" = "video" ]; then
+        case "$effective_provider" in
+          gemini|agy|antigravity) ;;
+          *)
+            # Engine picks agy-if-present else gemini. Stamp both keys.
+            write_google_models="true"
+            ;;
+        esac
+      fi
+
+      # image-gen uses grok or codex. A different configured provider is replaced
+      # by the engine, so stamp both model keys the fallback might read.
+      if [ "$MODE" = "image-gen" ]; then
+        case "$effective_provider" in
+          codex|grok|grok-build) ;;
+          *) write_image_models="true" ;;
+        esac
+      fi
+      if [ "$MODE" = "video-gen" ]; then
+        case "$effective_provider" in
+          grok|grok-build) ;;
+          *) write_video_model="true" ;;
+        esac
+      fi
+
+      if [ "$write_google_models" = "true" ]; then
+        write_config_key "gemini_model" "$MODEL"
+        write_config_key "agy_model" "$MODEL"
+      elif [ "$write_image_models" = "true" ]; then
+        write_config_key "grok_model" "$MODEL"
+        write_config_key "codex_model" "$MODEL"
+      elif [ "$write_video_model" = "true" ]; then
+        write_config_key "grok_model" "$MODEL"
+      else
+        local model_key=""
+        case "$effective_provider" in
+          codex)             model_key="codex_model" ;;
+          gemini)            model_key="gemini_model" ;;
+          agy|antigravity)   model_key="agy_model" ;;
+          opencode)          model_key="opencode_model" ;;
+          oz)                model_key="oz_model" ;;
+          grok|grok-build)   model_key="grok_model" ;;
+          claude)            model_key="claude_model" ;;
+          fm)                model_key="fm_model" ;;
+          *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
+        esac
+        write_config_key "$model_key" "$MODEL"
+      fi
     fi
-    if [ "$MODE" = "video-gen" ]; then
-      case "$effective_provider" in
-        grok|grok-build) ;;
-        *) write_video_model="true" ;;
-      esac
-    fi
 
-    write_model_key() {
-      local key="$1"
-      grep -v "^${key}=" "$config" > "$config.tmp" 2>/dev/null || true
-      printf '%s=%s\n' "$key" "$MODEL" >> "$config.tmp"
-      mv "$config.tmp" "$config"
-    }
-
-    if [ "$write_google_models" = "true" ]; then
-      write_model_key "gemini_model"
-      write_model_key "agy_model"
-    elif [ "$write_image_models" = "true" ]; then
-      write_model_key "grok_model"
-      write_model_key "codex_model"
-    elif [ "$write_video_model" = "true" ]; then
-      write_model_key "grok_model"
-    else
-      local model_key=""
-      case "$effective_provider" in
-        codex)             model_key="codex_model" ;;
-        gemini)            model_key="gemini_model" ;;
-        agy|antigravity)   model_key="agy_model" ;;
-        opencode)          model_key="opencode_model" ;;
-        oz)                model_key="oz_model" ;;
-        grok|grok-build)   model_key="grok_model" ;;
-        claude)            model_key="claude_model" ;;
-        *)                 die "unknown provider '$effective_provider' for --model mapping" ;;
+    if [ -n "$EFFORT" ]; then
+      case "$EFFORT" in
+        *$'\n'*|*$'\r'*) die "--effort must not contain line breaks" ;;
       esac
-      write_model_key "$model_key"
+
+      local effort_provider="$effective_provider"
+
+      if [ "$MODE" = "video" ]; then
+        case "$effort_provider" in
+          agy|antigravity|gemini) ;;
+          *)
+            if command -v agy >/dev/null 2>&1; then
+              effort_provider="agy"
+            else
+              effort_provider="gemini"
+            fi
+            ;;
+        esac
+      elif [ "$MODE" = "image-gen" ]; then
+        case "$effort_provider" in
+          codex|grok|grok-build) ;;
+          *)
+            if command -v grok >/dev/null 2>&1; then
+              effort_provider="grok"
+            elif command -v codex >/dev/null 2>&1; then
+              effort_provider="codex"
+            else
+              effort_provider="grok"
+            fi
+            ;;
+        esac
+      elif [ "$MODE" = "video-gen" ]; then
+        effort_provider="grok"
+      fi
+
+      local effort_key=""
+      case "$effort_provider" in
+        codex)                         effort_key="codex_reasoning_effort" ;;
+        agy|antigravity)               effort_key="agy_effort" ;;
+        grok|grok-build)               effort_key="grok_effort" ;;
+        gemini|opencode|oz|claude|fm)  die "--effort is not supported for provider '$effort_provider' (supported: codex, agy, grok)" ;;
+        *)                             die "unknown provider '$effort_provider' for --effort mapping" ;;
+      esac
+      write_config_key "$effort_key" "$EFFORT"
     fi
   fi
 
-  CONFIG_HOME="$home_dir"
+  STAGED_CONFIG="$config"
 }
 
 # Cap a blob to GIT_CONTEXT_MAX_BYTES and print it. On truncation, append a
@@ -811,6 +847,9 @@ run_engine() {
         kill -9 -"$pg" 2>/dev/null || true
       ) >/dev/null 2>&1 &
       k=$!
+      # Disown the watchdog subshell so set -m does not emit a job-control
+      # "Killed: 9" line on stderr when we reap it after a fast provider exit.
+      disown "$k" 2>/dev/null || true
       # `|| true` would make $? the status of true, so a provider that
       # exits before the deadline (or is killed by it) would look like success.
       ec=0
@@ -929,14 +968,14 @@ if [ "$want_dual" -eq 1 ]; then
 
   # Primary
   PROVIDER="$PRIMARY_PROVIDER"
-  CONFIG_HOME=""
-  build_config_home
-  run_engine_capture "$out_a" "$err_a" "$ec_a_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  STAGED_CONFIG=""
+  build_staged_config
+  run_engine_capture "$out_a" "$err_a" "$ec_a_file" env MIDFLIGHT_CONFIG="$STAGED_CONFIG" bash "$QUERY_SH" "${engine_args[@]}"
   # Secondary
   PROVIDER="$SECONDARY_PROVIDER"
-  CONFIG_HOME=""
-  build_config_home
-  run_engine_capture "$out_b" "$err_b" "$ec_b_file" env HOME="$CONFIG_HOME" bash "$QUERY_SH" "${engine_args[@]}"
+  STAGED_CONFIG=""
+  build_staged_config
+  run_engine_capture "$out_b" "$err_b" "$ec_b_file" env MIDFLIGHT_CONFIG="$STAGED_CONFIG" bash "$QUERY_SH" "${engine_args[@]}"
 
   # Keep provider logs on stderr (prefixed) so dual stdout stays the product.
   if [ -s "$err_a" ]; then
@@ -970,10 +1009,10 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   # that second so a file it writes is strictly newer than the stamp.
   sleep 1
   set +e
-  if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
-    CONFIG_HOME=""
-    build_config_home
-    HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
+  if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$EFFORT" ] || [ -n "$CONFIG_FILE" ]; then
+    STAGED_CONFIG=""
+    build_staged_config
+    MIDFLIGHT_CONFIG="$STAGED_CONFIG" run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   else
     run_engine bash "$QUERY_SH" "${engine_args[@]}" >"$media_out"
   fi
@@ -1003,10 +1042,10 @@ if [ "$MODE" = "image-gen" ] || [ "$MODE" = "video-gen" ]; then
   exit "$ec"
 fi
 
-if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$CONFIG_FILE" ]; then
-  CONFIG_HOME=""
-  build_config_home
-  HOME="$CONFIG_HOME" run_engine bash "$QUERY_SH" "${engine_args[@]}"
+if [ -n "$PROVIDER" ] || [ -n "$MODEL" ] || [ -n "$EFFORT" ] || [ -n "$CONFIG_FILE" ]; then
+  STAGED_CONFIG=""
+  build_staged_config
+  MIDFLIGHT_CONFIG="$STAGED_CONFIG" run_engine bash "$QUERY_SH" "${engine_args[@]}"
   ec=$?
 else
   run_engine bash "$QUERY_SH" "${engine_args[@]}"

@@ -71,6 +71,7 @@ assert_unrecognized opencode opencode OpenCode
 assert_unrecognized oz oz Oz
 assert_unrecognized grok grok Grok
 assert_unrecognized claude claude Claude
+assert_unrecognized fm fm fm
 
 printf 'provider=%s\n' "codex" > "$HOME/.config/mid-flight/config"
 cat > "$TEST_DIR/bin/codex" <<'EOF'

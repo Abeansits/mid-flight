@@ -1,6 +1,6 @@
 ---
 name: midflight
-description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, or Claude for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
+description: "Consult Codex, Gemini, Antigravity, OpenCode, Oz, Grok, Claude, or fm for a second opinion mid-development, or analyze video with Antigravity/Gemini. Use when the user types /midflight, asks for an outside take, or you are stuck after multiple failed approaches."
 user-invocable: true
 argument-hint: "[question | --video <path-or-url> [prompt] | --provider <name> | --allow-grok-provider]"
 metadata:
@@ -16,7 +16,7 @@ Supports text consultation, implementation delegation, and **video analysis**.
 
 ## Circular provider guard
 
-`provider=grok` on the Grok Build host is circular. MidFlight prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` on `PATH`, or refuses if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or pass `--allow-grok-provider` (required for an explicit `--provider grok`).
+`provider=grok` on the Grok Build host is circular. MidFlight prefers `codex` → `agy` → `opencode` → `oz` → `gemini` → `claude` → `fm` on `PATH`, or refuses if none are available. Override with `MIDFLIGHT_ALLOW_GROK_PROVIDER=1` or pass `--allow-grok-provider` (required for an explicit `--provider grok`). `fm` is consult-only.
 
 The default provider is often `codex`, which is already a fine external consult — no rewrite needed unless config sets `provider=grok`.
 
