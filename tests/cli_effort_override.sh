@@ -69,7 +69,8 @@ assert_eq "low" "$(cat "$TEST_DIR/grok_effort.txt")" "grok should receive --effo
 # 5. Providers without an effort key exit 2 with midflight: on stderr and empty stdout.
 write_gemini_stub "should-not-run"
 write_claude_stub "should-not-run"
-for no_effort_provider in gemini opencode oz claude; do
+write_fm_stub "should-not-run" "10"
+for no_effort_provider in gemini opencode oz claude fm; do
   set +e
   run_cli -p "$no_effort_provider" --effort high "Unsupported effort" >"$stdout_file" 2>"$stderr_file"
   status=$?
@@ -161,6 +162,7 @@ assert_eq "high" "$(cat "$TEST_DIR/grok_effort.txt")" \
 # When grok is absent and codex is present, image-gen falls back to codex and
 # must not write grok_effort=xhigh (which fails config validation).
 rm -f "$TEST_DIR/bin/grok" "$TEST_DIR/codex_reasoning.txt"
+hide_system_tools grok
 cat > "$TEST_DIR/bin/codex" <<EOF
 #!/bin/bash
 set -euo pipefail
@@ -204,5 +206,22 @@ if [ ! -f "$output" ] || [ ! "$output" -ef "$clip" ]; then
 fi
 assert_eq "low" "$(cat "$TEST_DIR/grok_effort.txt")" \
   "video-gen should pass --effort to grok"
+
+# 11. Multiline --effort values must be rejected before staging config keys.
+rm -f "$TEST_DIR/codex_reasoning.txt"
+for bad_effort in $'high\ncodex_model=injected' $'high\rcodex_model=injected'; do
+  set +e
+  run_cli -p codex --effort "$bad_effort" "Reject multiline effort" >"$stdout_file" 2>"$stderr_file"
+  status=$?
+  set -e
+  assert_eq "2" "$status" "multiline --effort should exit 2"
+  assert_eq "" "$(cat "$stdout_file")" "multiline --effort should print empty stdout"
+  assert_contains "$(cat "$stderr_file")" "midflight: --effort must not contain line breaks" \
+    "multiline --effort should explain why it was rejected"
+  if [ -f "$TEST_DIR/codex_reasoning.txt" ]; then
+    echo "FAIL: multiline --effort must not invoke the provider" >&2
+    exit 1
+  fi
+done
 
 echo "PASS: --effort maps to provider effort keys and rejects unsupported providers/dual"

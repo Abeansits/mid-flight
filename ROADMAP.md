@@ -11,7 +11,7 @@ brew tap Abeansits/mid-flight https://github.com/Abeansits/mid-flight
 brew install Abeansits/mid-flight/midflight
 ```
 
-`Formula/midflight.rb` installs the tagged archive it names. That tag is v1.18.0 until a formula update lands on `main`. `brew install --HEAD Abeansits/mid-flight/midflight` tracks `main`. `brew tap Abeansits/mid-flight` with no URL looks for `Abeansits/homebrew-mid-flight`, which does not exist. `brew install --formula ./Formula/midflight.rb` is not a tap, and current Homebrew rejects it.
+`Formula/midflight.rb` installs the tagged archive it names. That tag is v1.19.2 until a formula update lands on `main`. `brew install --HEAD Abeansits/mid-flight/midflight` tracks `main`. `brew tap Abeansits/mid-flight` with no URL looks for `Abeansits/homebrew-mid-flight`, which does not exist. `brew install --formula ./Formula/midflight.rb` is not a tap, and current Homebrew rejects it.
 
 Release order: publish the tag, update the formula `url` and `sha256`, land that change on `main`, then `brew upgrade`. Stable Homebrew does not serve the new tag before that formula change. The checklist is in the README [Releasing](README.md#releasing) section.
 
