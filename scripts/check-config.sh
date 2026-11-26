@@ -72,6 +72,14 @@ main() {
       "https://antigravity.google/docs/cli/install"
   fi
 
+  # Video helpers. Without them a video link or an oversized file is an error.
+  report_provider_status "yt-dlp" "yt-dlp (downloads video links for --video URL)" "optional" || true
+  if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+    printf '[ok] ffmpeg + ffprobe (shrink or convert video that a provider cannot read): %s\n' "$(command -v ffmpeg)"
+  else
+    printf '[info] ffmpeg + ffprobe (shrink or convert video that a provider cannot read): not found in PATH\n'
+  fi
+
   report_provider_status "codex" "Codex (optional alternate provider)" "optional" || true
   report_provider_status "opencode" "OpenCode (optional alternate provider)" "optional" || true
   report_provider_status "oz" "Oz (optional alternate provider)" "optional" || true

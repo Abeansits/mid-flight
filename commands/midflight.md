@@ -34,7 +34,7 @@ Consult-only. Hosts do not need a separate dual UX; run the CLI (or tell the use
 
    - **`--video <file-or-url>`** — If present, this is a video analysis request. Extract the video source (local path or URL) and any remaining text as the question/prompt.
      - Example: `--video /path/to/ad.mp4 Does this match the storyboard?`
-     - Example: `--video https://youtube.com/watch?v=abc123`
+     - Example: `--video https://youtube.com/watch?v=abc123` (the engine downloads a link with `yt-dlp`, then analyzes the file)
      - Example: `--video ./demo.mp4` (no question = default scene breakdown)
    - **Text question** — If no `--video` flag, treat as a standard text consultation (same as before).
    - **Empty** — Identify what would most benefit from a second opinion based on the conversation so far.

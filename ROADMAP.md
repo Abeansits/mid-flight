@@ -15,7 +15,7 @@ brew install Abeansits/mid-flight/midflight
 
 Release order: publish the tag, update the formula `url` and `sha256`, land that change on `main`, then `brew upgrade`. Stable Homebrew does not serve the new tag before that formula change. The checklist is in the README [Releasing](README.md#releasing) section.
 
-Video analysis keeps a configured or `-p` provider of `agy` or `gemini`. Any other provider prefers `agy` on `PATH`, else Gemini. Video generation is Grok. A readable PNG or JPEG opening frame that conflicts with `--aspect` exits 2. An unreadable frame warns on stderr and continues.
+Video analysis keeps a configured or `-p` provider of `agy` or `gemini`. Any other provider prefers `agy` on `PATH`, else Gemini. A link is downloaded with `yt-dlp` and analyzed as a file. The size limit is 100MB on `agy` and 20MB on Gemini, and `ffmpeg` shrinks what does not fit. Video generation is Grok. A readable PNG or JPEG opening frame that conflicts with `--aspect` exits 2. An unreadable frame warns on stderr and continues.
 
 Nothing else is queued.
 
@@ -29,6 +29,7 @@ Nothing else is queued.
 - v1.13.0 — Codex consult uses `--sandbox read-only`. Implement uses `workspace-write`.
 - v1.14.0 — `scripts/install.sh` and a HEAD-only formula. The custom installer is gone. Homebrew is the install path. `scripts/release.sh prepare` still writes the version to `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`.
 - v1.15.1 — dual-consult rebuilds the temp `$HOME` overlay for each side (`ln -sfn`).
+- v1.20.0 — video links are downloaded with `yt-dlp` and analyzed as files. The size limit is per provider (100MB `agy`, 20MB Gemini). `ffmpeg` shrinks an oversized file and converts a format the provider does not read. Staged files keep their extension. `agy` is told to open the file with its file-reading tool.
 - Cursor skills live only under `hosts/cursor/`. There is no separate grok-bot host.
 - The formula installs a tagged archive under Homebrew `libexec`, so `bin/midflight` still finds `scripts/` and `.claude-plugin/` from its real path.
 

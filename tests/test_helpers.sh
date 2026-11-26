@@ -328,3 +328,59 @@ assert_contains() {
     exit 1
   fi
 }
+
+# Stub yt-dlp: record its arguments and write a fake download where -o points.
+# Optional arg sets the extension of the file it writes.
+write_ytdlp_stub() {
+  local ext="${1:-mp4}"
+
+  cat > "$TEST_DIR/bin/yt-dlp" <<EOF2
+#!/bin/bash
+set -euo pipefail
+printf '%s\n' "\$@" > "$TEST_DIR/ytdlp_args.txt"
+template=""
+print=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o) template="\$2"; shift 2 ;;
+    --print) print="\$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+# A metadata file that sorts before the video, as a user's yt-dlp config
+# with --write-info-json would leave.
+printf '{}' > "\${template%.*}.info.json"
+printf 'downloaded-video-bytes' > "\${template%.*}.$ext"
+if [ -n "\$print" ]; then
+  printf '%s\n' "\${template%.*}.$ext"
+fi
+EOF2
+  chmod +x "$TEST_DIR/bin/yt-dlp"
+}
+
+# Stub ffprobe (prints a duration in seconds) and ffmpeg (records its
+# arguments and writes a small file at the last argument).
+write_ffmpeg_stubs() {
+  local duration="${1:-30}"
+
+  cat > "$TEST_DIR/bin/ffprobe" <<EOF2
+#!/bin/bash
+printf '%s\n' "$duration.000000"
+EOF2
+  cat > "$TEST_DIR/bin/ffmpeg" <<EOF2
+#!/bin/bash
+set -euo pipefail
+printf '%s\n' "\$@" > "$TEST_DIR/ffmpeg_args.txt"
+for last in "\$@"; do :; done
+printf 'shrunk-video-bytes' > "\$last"
+EOF2
+  chmod +x "$TEST_DIR/bin/ffprobe" "$TEST_DIR/bin/ffmpeg"
+}
+
+# Write a file of N megabytes without spending real disk time on it.
+write_sized_file() {
+  local path="$1"
+  local megabytes="$2"
+
+  dd if=/dev/zero of="$path" bs=1048576 count="$megabytes" 2>/dev/null
+}
